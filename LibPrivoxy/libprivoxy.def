@@ -1,0 +1,5 @@
+LIBRARY LibPrivoxy
+EXPORTS
+StartPrivoxy
+stop_privoxy
+is_privoxy_started
