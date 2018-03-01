@@ -21,6 +21,12 @@ bld/
 [Bb]in/
 [Oo]bj/
 [Ll]og/
+/DLL_Debug/
+/DLL_Release/
+/LIB_Debug/
+/LIB_Release/
+/LibPrivoxy/Lib_Debug/
+/LibPrivoxy/Lib_Release/
 
 # Visual Studio 2015 cache/options directory
 .vs/
