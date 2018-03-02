@@ -164,6 +164,8 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <None Include="..\LICENSE" />
+    <None Include="..\README.md" />
     <None Include="..\src\icons\off.ico" />
     <None Include="..\src\icons\privoxy.ico" />
     <None Include="..\src\icons\radar-01.ico" />

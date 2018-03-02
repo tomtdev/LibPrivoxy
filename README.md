@@ -4,9 +4,12 @@ Many people want to integrate Privoxy into their own projects, I made some chang
 <br/>
 Base on work from:
 <br/>
-LibPrivoxy: https://github.com/tarolabs/LibPrivoxy<br/>
-Privoxy: https://www.privoxy.org/<br/><br/>
+LibPrivoxy: https://github.com/tarolabs/LibPrivoxy
+<br/>
+Privoxy: https://www.privoxy.org/
+<br/>
+<br/>
 Develop environment:<br/>
 Visual Studio 2017<br/>
 <br/>
-LibPrivoxy is licensed under the GNU GPLv2.<br/>
+LibPrivoxy is licensed under the GNU GPL v2.<br/>

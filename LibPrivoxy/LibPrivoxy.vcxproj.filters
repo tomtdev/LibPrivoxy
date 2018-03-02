@@ -92,6 +92,8 @@
     <None Include="libprivoxy.def">
       <Filter>Source Files</Filter>
     </None>
+    <None Include="..\README.md" />
+    <None Include="..\LICENSE" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="stdafx.h">
