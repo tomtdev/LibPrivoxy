@@ -17,14 +17,16 @@ License: GNU GENERAL PUBLIC LICENSE Version 2
 <br/>
 Author: Shiyu Tang <shiyutang#gmail.com>
 <br/>
+<br/>
 Sample code (C#):
 <br/>
 <br/>
 <code>
 public class PrivoxyWrapper
 {
+
     [DllImport(@"LibPrivoxy.dll")]
-    public static extern int StartPrivoxy([MarshalAs(UnmanagedType.LPStr)] string theConfigFullPath);
+    public static extern int StartPrivoxy([MarshalAs(UnmanagedType.LPStr)] string configFileFullPath);
 
     [DllImport(@"LibPrivoxy.dll")]
     public static extern void StopPrivoxy();
