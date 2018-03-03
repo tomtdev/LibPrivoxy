@@ -4357,7 +4357,6 @@ static void listen_loop(void)
    /* Cleanup - remove taskbar icon etc. */
    TermLogWindow();
 #endif
-
    exit(0);
 #endif /* FEATURE_GRACEFUL_TERMINATION */
 

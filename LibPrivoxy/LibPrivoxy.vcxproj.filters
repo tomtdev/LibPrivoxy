@@ -96,9 +96,6 @@
     <None Include="..\LICENSE" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="stdafx.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="targetver.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -210,23 +207,20 @@
     <ClInclude Include="..\src\config.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\libprivoxy.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="..\src\resource.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\src\libprivoxyext.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="libprivoxy.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="stdafx.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="stdafx.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="dllmain.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="..\src\w32log.c">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -320,10 +314,16 @@
     <ClCompile Include="..\src\pcre\pcreposix.c">
       <Filter>pcre</Filter>
     </ClCompile>
-    <ClCompile Include="..\libprivoxy.cpp">
+    <ClCompile Include="..\src\libprivoxyext.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\libprivoxyext.c">
+    <ClCompile Include="dllmain.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="libprivoxy.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="stdafx.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

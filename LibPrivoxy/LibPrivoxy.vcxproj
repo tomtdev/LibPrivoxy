@@ -77,7 +77,7 @@
     <LinkIncremental>true</LinkIncremental>
     <IncludePath>$(SolutionDir)LibPrivoxy;$(SolutionDir)src;$(SolutionDir)src\pcre;$(SolutionDir)cryptopp562;$(IncludePath)</IncludePath>
     <LibraryPath>$(SolutionDir)Debug;$(LibraryPath)</LibraryPath>
-    <OutDir>$(SolutionDir)LIB_Debug</OutDir>
+    <OutDir>$(SolutionDir)LIB_Debug\</OutDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
@@ -89,7 +89,7 @@
     <LinkIncremental>false</LinkIncremental>
     <IncludePath>$(SolutionDir)LibPrivoxy;$(SolutionDir)src;$(SolutionDir)src\pcre;$(SolutionDir)cryptopp562;$(IncludePath)</IncludePath>
     <LibraryPath>$(SolutionDir)Release;$(LibraryPath)</LibraryPath>
-    <OutDir>$(SolutionDir)LIB_Release</OutDir>
+    <OutDir>$(SolutionDir)LIB_Release\</OutDir>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -104,7 +104,7 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <ModuleDefinitionFile>libprivoxy.def</ModuleDefinitionFile>
       <ImportLibrary>$(SolutionDir)DLL_Debug\LibPrivoxyD.lib</ImportLibrary>
-      <AdditionalDependencies>kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;ws2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Lib_Debug|Win32'">
@@ -112,7 +112,7 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <PreprocessorDefinitions>WIN32;_DEBUG;_WINDOWS;_USRDLL;LIBPRIVOXY_EXPORTS;%(PreprocessorDefinitions);HAVE_STRERROR;STATIC_PCRE;STATIC_PCRS;FEATURE_CLIENT_TAGS;HAVE_MEMMOVE;_WIN_CONSOLE;LIBPRIVOXY;FEATURE_GRACEFUL_TERMINATION;RES_IN_DLL;FEATURE_ENCRYPTCFG_N</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_WINDOWS;_USRDLL;LIBPRIVOXY_EXPORTS;%(PreprocessorDefinitions);HAVE_STRERROR;STATIC_PCRE;STATIC_PCRS;FEATURE_CLIENT_TAGS;HAVE_MEMMOVE;_WIN_CONSOLE;LIBPRIVOXY;FEATURE_GRACEFUL_TERMINATION;RES_IN_DLL</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
     </ClCompile>
     <Link>
@@ -120,7 +120,7 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <ModuleDefinitionFile>libprivoxy.def</ModuleDefinitionFile>
       <ImportLibrary>$(SolutionDir)$(Configuration)\LibPrivoxyD.lib</ImportLibrary>
-      <AdditionalDependencies>kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies);cryptlib32d.lib</AdditionalDependencies>
+      <AdditionalDependencies>kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies);cryptlib32d.lib;ws2_32.lib</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -140,7 +140,7 @@
       <OptimizeReferences>true</OptimizeReferences>
       <ModuleDefinitionFile>libprivoxy.def</ModuleDefinitionFile>
       <ImportLibrary>$(SolutionDir)DLL_Release\LibPrivoxyR.lib</ImportLibrary>
-      <AdditionalDependencies>kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;ws2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Lib_Release|Win32'">
@@ -160,7 +160,7 @@
       <OptimizeReferences>true</OptimizeReferences>
       <ModuleDefinitionFile>libprivoxy.def</ModuleDefinitionFile>
       <ImportLibrary>$(SolutionDir)$(Configuration)\LibPrivoxyR.lib</ImportLibrary>
-      <AdditionalDependencies>kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies);cryptlib32r.lib</AdditionalDependencies>
+      <AdditionalDependencies>kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies);cryptlib32r.lib;ws2_32.lib</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -220,7 +220,6 @@
     <None Include="ReadMe.txt" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\libprivoxy.h" />
     <ClInclude Include="..\src\acconfig.h" />
     <ClInclude Include="..\src\actionlist.h" />
     <ClInclude Include="..\src\actions.h" />
@@ -259,11 +258,11 @@
     <ClInclude Include="..\src\w32svrapi.h" />
     <ClInclude Include="..\src\w32taskbar.h" />
     <ClInclude Include="..\src\win32.h" />
+    <ClInclude Include="libprivoxy.h" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="targetver.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\libprivoxy.cpp" />
     <ClCompile Include="..\src\actions.c" />
     <ClCompile Include="..\src\amiga.c" />
     <ClCompile Include="..\src\cgi.c" />
@@ -296,7 +295,7 @@
     <ClCompile Include="..\src\w32svrapi.c" />
     <ClCompile Include="..\src\w32taskbar.c" />
     <ClCompile Include="..\src\win32.c" />
-    <ClCompile Include="dllmain.cpp">
+    <ClCompile Include="dllmain.c">
       <CompileAsManaged Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">false</CompileAsManaged>
       <CompileAsManaged Condition="'$(Configuration)|$(Platform)'=='Lib_Debug|Win32'">false</CompileAsManaged>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
@@ -310,12 +309,8 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Lib_Release|Win32'">
       </PrecompiledHeader>
     </ClCompile>
-    <ClCompile Include="stdafx.cpp">
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Lib_Debug|Win32'">Create</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Lib_Release|Win32'">Create</PrecompiledHeader>
-    </ClCompile>
+    <ClCompile Include="libprivoxy.c" />
+    <ClCompile Include="stdafx.c" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="..\src\w32.rc" />

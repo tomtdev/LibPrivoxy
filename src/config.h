@@ -16,7 +16,6 @@
 
 #ifdef LIBPRIVOXY
 #define exit libprivoxy_exit
-#define FreeConsole libprivoxy_FreeConsole
 #endif
 
 #define FEATURE_CONNECTION_KEEP_ALIVE

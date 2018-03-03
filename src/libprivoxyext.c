@@ -30,10 +30,5 @@ int	gettimeofday(struct timeval *tp, void *tzp)
 
 void libprivoxy_exit(int _Code)
 {
-	printf("libprivoxy_exit: %d\n", _Code);
-}
-
-int __stdcall libprivoxy_FreeConsole(void)
-{
-	return 0;
+	_endthread(_Code);
 }

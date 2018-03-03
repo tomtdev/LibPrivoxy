@@ -239,7 +239,9 @@ void InitWin32(void)
    SetProcessShutdownParameters(0x100, SHUTDOWN_NORETRY);
    if (hideConsole)
    {
+#ifndef LIBPRIVOXY
       FreeConsole();
+#endif
    }
 #endif
    wVersionRequested = MAKEWORD(2, 0);

@@ -6,5 +6,4 @@
 #endif
 
 	void libprivoxy_exit(int _Code);
-	int __stdcall libprivoxy_FreeConsole(void);
 #endif
