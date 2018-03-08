@@ -1273,6 +1273,7 @@ struct client_tag_spec
 /** configuration_spec::feature_flags: Proxy authentication headers are forwarded instead of removed. */
 #define RUNTIME_FEATURE_FORWARD_PROXY_AUTHENTICATION_HEADERS      4096U
 
+#define MAX_DNS_SERVERS 6
 /**
  * Data loaded from the configuration file.
  *
@@ -1341,6 +1342,10 @@ struct configuration_spec
 
    /** Size limit for IOB */
    size_t buffer_limit;
+   
+   /** Use specified DNS servers. */
+   const char *dns_servers[MAX_DNS_SERVERS];
+   int dns_servers_count;
 
 #ifdef FEATURE_TRUST
 

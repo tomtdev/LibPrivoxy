@@ -121,7 +121,11 @@ const char jcc_rcs[] = "$Id: jcc.c,v 1.446 2016/05/25 10:54:01 fabiankeil Exp $"
 
 #ifdef LIBPRIVOXY
 jb_socket bfds[MAX_LISTENING_SOCKETS];
+extern char g_privoxy_config_full_path[1024];
 #endif
+
+extern const char **dns_servers;
+extern int dns_servers_count;
 
 const char jcc_h_rcs[] = JCC_H_VERSION;
 const char project_h_rcs[] = PROJECT_H_VERSION;
@@ -137,10 +141,6 @@ int urls_rejected = 0;     /* total nr of urls rejected */
 
 #ifdef FEATURE_GRACEFUL_TERMINATION
 int g_terminate = 0;
-#endif
-
-#if defined( _WIN32 ) && defined( LIBPRIVOXY )
-	extern char g_privoxy_config_full_path[1024];
 #endif
 
 #if !defined(_WIN32) && !defined(__OS2__) && !defined(AMIGA)
@@ -3989,6 +3989,9 @@ static void listen_loop(void)
    unsigned int active_threads = 0;
 
    config = load_config();
+
+   dns_servers = config->dns_servers;
+   dns_servers_count = config->dns_servers_count;
 
 #ifdef FEATURE_CONNECTION_SHARING
    /*

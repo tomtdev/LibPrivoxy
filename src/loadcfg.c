@@ -135,6 +135,7 @@ static struct file_list *current_configfile = NULL;
 #define hash_debug                            78263U /* "debug" */
 #define hash_default_server_timeout      2530089913U /* "default-server-timeout" */
 #define hash_deny_access                 1227333715U /* "deny-access" */
+#define hash_dns_servers				 1242045460U /* "dns-servers" */
 #define hash_enable_edit_actions         2517097536U /* "enable-edit-actions" */
 #define hash_enable_compression          3943696946U /* "enable-compression" */
 #define hash_enable_proxy_authentication_forwarding 4040610791U /* enable-proxy-authentication-forwarding */
@@ -248,6 +249,10 @@ static void unload_configfile (void * data)
       freez(config->actions_file[i]);
       freez(config->re_filterfile_short[i]);
       freez(config->re_filterfile[i]);
+   }
+
+   for (i = 0; i < MAX_DNS_SERVERS; i++) {
+	   freez(config->dns_servers[i]);
    }
 
    list_remove_all(config->ordered_client_headers);
@@ -1273,6 +1278,18 @@ struct configuration_spec * load_config(void)
          case hash_forwarded_connect_retries :
             config->forwarded_connect_retries = parse_numeric_value(cmd, arg);
             break;
+
+/* *************************************************************************
+* dns-servers server1ip;server2ip
+* *************************************************************************/
+		 case hash_dns_servers:
+			 strlcpy(tmp, arg, sizeof(tmp));
+			 vec_count = ssplit(tmp, ";", vec, SZ(vec));
+			 for (i = 0; i < vec_count && i < MAX_DNS_SERVERS; ++i) {
+				 config->dns_servers[i] = strdup(vec[i]);
+				 config->dns_servers_count++;
+			 }
+			 break;
 
 /* *************************************************************************
  * handle-as-empty-doc-returns-ok 0|1

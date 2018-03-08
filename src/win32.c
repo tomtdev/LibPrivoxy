@@ -244,7 +244,7 @@ void InitWin32(void)
 #endif
    }
 #endif
-   wVersionRequested = MAKEWORD(2, 0);
+   wVersionRequested = MAKEWORD(2, 2);
    if (WSAStartup(wVersionRequested, &wsaData) != 0)
    {
 #ifndef _WIN_CONSOLE

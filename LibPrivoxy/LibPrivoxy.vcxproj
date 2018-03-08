@@ -96,7 +96,7 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <PreprocessorDefinitions>WIN32;_DEBUG;_WINDOWS;_USRDLL;LIBPRIVOXY_EXPORTS;%(PreprocessorDefinitions);HAVE_STRERROR;STATIC_PCRE;STATIC_PCRS;FEATURE_CLIENT_TAGS;HAVE_MEMMOVE;_WIN_CONSOLE;LIBPRIVOXY;FEATURE_GRACEFUL_TERMINATION;RES_IN_DLL;FEATURE_ENCRYPTCFG_N</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_WINDOWS;_USRDLL;LIBPRIVOXY_EXPORTS;%(PreprocessorDefinitions);HAVE_STRERROR;STATIC_PCRE;STATIC_PCRS;FEATURE_CLIENT_TAGS;HAVE_MEMMOVE;_WIN_CONSOLE;_CRT_SECURE_NO_WARNINGS;LIBPRIVOXY;FEATURE_GRACEFUL_TERMINATION;RES_IN_DLL;FEATURE_ENCRYPTCFG_N</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
     </ClCompile>
     <Link>
@@ -130,7 +130,7 @@
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <PreprocessorDefinitions>WIN32;NDEBUG;_WINDOWS;_USRDLL;LIBPRIVOXY_EXPORTS;%(PreprocessorDefinitions);HAVE_STRERROR;STATIC_PCRE;STATIC_PCRS;FEATURE_CLIENT_TAGS;HAVE_MEMMOVE;_WIN_CONSOLE;LIBPRIVOXY;FEATURE_GRACEFUL_TERMINATION;RES_IN_DLL;FEATURE_ENCRYPTCFG_N</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_WINDOWS;_USRDLL;LIBPRIVOXY_EXPORTS;%(PreprocessorDefinitions);HAVE_STRERROR;STATIC_PCRE;STATIC_PCRS;FEATURE_CLIENT_TAGS;HAVE_MEMMOVE;_WIN_CONSOLE;_CRT_SECURE_NO_WARNINGS;LIBPRIVOXY;FEATURE_GRACEFUL_TERMINATION;RES_IN_DLL;FEATURE_ENCRYPTCFG_N</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
     </ClCompile>
     <Link>

@@ -10,8 +10,8 @@
 #define HAVE_SNPRINTF 1
 
 #ifdef _MSC_VER
-#define strcasecmp stricmp
-#define strncasecmp  strnicmp 
+#define strcasecmp _stricmp
+#define strncasecmp  _strnicmp
 #endif
 
 #ifdef LIBPRIVOXY
