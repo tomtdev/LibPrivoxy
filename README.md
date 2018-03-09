@@ -4,9 +4,9 @@ Many people want to integrate Privoxy into their own projects, I made some chang
 <br/>
 Base on work from:
 <br/>
-LibPrivoxy: https://github.com/tarolabs/LibPrivoxy
-<br/>
 Privoxy: https://www.privoxy.org/ (based on its latest version 3.0.26)
+<br/>
+LibPrivoxy: https://github.com/tarolabs/LibPrivoxy
 <br/>
 DNS query: https://www.binarytides.com/dns-query-code-in-c-with-winsock/
 <br/>
@@ -20,6 +20,7 @@ Author: Shiyu Tang <shiyutang#gmail.com>
 <br/>
 <br/>
 You can set DNS servers in config file to use specified DNS servers (of example, 8.8.8.8 and/or 208.67.222.222) instead of system-wide DNS settings. You can add no more than 6 DNS servers. Like:
+<br/>
 <br/>
 <code>
 dns-servers 8.8.8.8;208.67.222.222

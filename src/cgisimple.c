@@ -71,6 +71,7 @@ static jb_err show_defines(struct map *exports);
 static jb_err cgi_show_file(struct client_state *csp,
                             struct http_response *rsp,
                             const struct map *parameters);
+static jb_err load_file(const char *filename, char **buffer, size_t *length);
 
 /*********************************************************************
  *

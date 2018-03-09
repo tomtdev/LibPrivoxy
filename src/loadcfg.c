@@ -633,6 +633,8 @@ struct configuration_spec * load_config(void)
 #endif
    config->feature_flags            &= ~RUNTIME_FEATURE_TOLERATE_PIPELINING;
 
+   config->dns_servers_count		 = 0;
+
    configfp = fopen(configfile, "r");
    if (NULL == configfp)
    {
