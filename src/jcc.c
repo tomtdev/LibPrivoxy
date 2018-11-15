@@ -3592,7 +3592,7 @@ int main(int argc, char **argv)
 
 }
 #else /* ifdef _WIN32 */
-# ifdef _WIN_CONSOLE
+# if defined(_WIN_CONSOLE) && !defined(LIBPRIVOXY)
    /*
     * We *are* in a windows console app.
     * Print a verbose messages about FAQ's and such
