@@ -34,8 +34,6 @@ const char jcc_rcs[] = "$Id: jcc.c,v 1.446 2016/05/25 10:54:01 fabiankeil Exp $"
  *********************************************************************/
 
 
-#include "config.h"
-
 #include <stdio.h>
 #include <sys/types.h>
 #include <stdlib.h>
@@ -100,6 +98,8 @@ const char jcc_rcs[] = "$Id: jcc.c,v 1.446 2016/05/25 10:54:01 fabiankeil Exp $"
 # endif
 
 #endif
+
+#include "config.h"
 
 #include "project.h"
 #include "list.h"

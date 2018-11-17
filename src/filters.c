@@ -33,8 +33,6 @@ const char filters_rcs[] = "$Id: filters.c,v 1.202 2016/05/25 10:50:55 fabiankei
  *********************************************************************/
 
 
-#include "config.h"
-
 #include <stdio.h>
 #include <sys/types.h>
 #include <stdlib.h>
@@ -54,6 +52,8 @@ const char filters_rcs[] = "$Id: filters.c,v 1.202 2016/05/25 10:50:55 fabiankei
 #ifdef __OS2__
 #include <utils.h>
 #endif /* def __OS2__ */
+
+#include "config.h"
 
 #include "project.h"
 #include "filters.h"

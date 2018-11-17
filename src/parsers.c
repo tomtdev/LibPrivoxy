@@ -33,7 +33,6 @@ const char parsers_rcs[] = "$Id: parsers.c,v 1.309 2016/04/30 10:28:36 fabiankei
  *********************************************************************/
 
 
-#include "config.h"
 
 #ifndef _WIN32
 #include <stdio.h>
@@ -69,6 +68,8 @@ const char parsers_rcs[] = "$Id: parsers.c,v 1.309 2016/04/30 10:28:36 fabiankei
 #if !defined(_WIN32) && !defined(__OS2__)
 #include <unistd.h>
 #endif
+
+#include "config.h"
 
 #include "project.h"
 

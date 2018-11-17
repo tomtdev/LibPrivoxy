@@ -12,6 +12,7 @@
 #ifdef _MSC_VER
 #define strcasecmp _stricmp
 #define strncasecmp  _strnicmp
+#define strdup _strdup
 #endif
 
 #ifdef LIBPRIVOXY

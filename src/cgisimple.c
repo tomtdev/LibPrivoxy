@@ -34,8 +34,6 @@ const char cgisimple_rcs[] = "$Id: cgisimple.c,v 1.142 2016/05/22 12:43:07 fabia
  **********************************************************************/
 
 
-#include "config.h"
-
 #include <stdio.h>
 #include <sys/types.h>
 #include <stdlib.h>
@@ -46,6 +44,8 @@ const char cgisimple_rcs[] = "$Id: cgisimple.c,v 1.142 2016/05/22 12:43:07 fabia
 #if defined (HAVE_ACCESS) && defined (HAVE_UNISTD_H)
 #include <unistd.h>
 #endif /* def HAVE_ACCESS && HAVE_UNISTD_H */
+
+#include "config.h"
 
 #include "project.h"
 #include "cgi.h"

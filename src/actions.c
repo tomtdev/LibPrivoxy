@@ -33,8 +33,6 @@ const char actions_rcs[] = "$Id: actions.c,v 1.97 2016/05/03 13:20:37 fabiankeil
  *********************************************************************/
 
 
-#include "config.h"
-
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>
@@ -43,6 +41,8 @@ const char actions_rcs[] = "$Id: actions.c,v 1.97 2016/05/03 13:20:37 fabiankeil
 #ifdef FEATURE_PTHREAD
 #include <pthread.h>
 #endif
+
+#include "config.h"
 
 #include "project.h"
 #include "jcc.h"

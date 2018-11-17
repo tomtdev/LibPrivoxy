@@ -44,7 +44,6 @@ const char miscutil_rcs[] = "$Id: miscutil.c,v 1.82 2016/07/23 23:05:15 ler762 E
  *********************************************************************/
 
 
-#include "config.h"
 
 #include <stdio.h>
 #include <sys/types.h>
@@ -59,6 +58,8 @@ const char miscutil_rcs[] = "$Id: miscutil.c,v 1.82 2016/07/23 23:05:15 ler762 E
 #if !defined(HAVE_TIMEGM) && defined(HAVE_TZSET) && defined(HAVE_PUTENV)
 #include <time.h>
 #endif /* !defined(HAVE_TIMEGM) && defined(HAVE_TZSET) && defined(HAVE_PUTENV) */
+
+#include "config.h"
 
 #include "project.h"
 #include "miscutil.h"

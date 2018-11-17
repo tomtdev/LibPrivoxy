@@ -36,7 +36,6 @@ const char loadcfg_rcs[] = "$Id: loadcfg.c,v 1.153 2016/05/22 12:43:07 fabiankei
  *********************************************************************/
 
 
-#include "config.h"
 
 #include <stdio.h>
 #include <sys/types.h>
@@ -71,6 +70,8 @@ const char loadcfg_rcs[] = "$Id: loadcfg.c,v 1.153 2016/05/22 12:43:07 fabiankei
 # include <signal.h>
 
 #endif
+
+#include "config.h"
 
 #include "project.h"
 #include "loadcfg.h"

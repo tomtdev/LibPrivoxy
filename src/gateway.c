@@ -35,8 +35,6 @@ const char gateway_rcs[] = "$Id: gateway.c,v 1.96 2016/01/16 12:30:43 fabiankeil
  *********************************************************************/
 
 
-#include "config.h"
-
 #include <stdio.h>
 #include <sys/types.h>
 
@@ -59,6 +57,8 @@ const char gateway_rcs[] = "$Id: gateway.c,v 1.96 2016/01/16 12:30:43 fabiankeil
 #ifdef __OS2__
 #include <utils.h>
 #endif /* def __OS2__ */
+
+#include "config.h"
 
 #include "project.h"
 #include "jcc.h"

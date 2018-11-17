@@ -36,8 +36,6 @@ const char jbsockets_rcs[] = "$Id: jbsockets.c,v 1.137 2016/08/22 14:50:18 fabia
  *********************************************************************/
 
 
-#include "config.h"
-
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -90,6 +88,8 @@ const char jbsockets_rcs[] = "$Id: jbsockets.c,v 1.137 2016/08/22 14:50:18 fabia
 #include <poll.h>
 #endif /* def __GLIBC__ */
 #endif /* HAVE_POLL */
+
+#include "config.h"
 
 #include "project.h"
 

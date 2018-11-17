@@ -33,7 +33,6 @@ const char list_rcs[] = "$Id: list.c,v 1.32 2014/11/14 10:39:49 fabiankeil Exp $
  *********************************************************************/
 
 
-#include "config.h"
 
 #ifndef _WIN32
 /* FIXME: The following headers are not needed for Win32.  Are they
@@ -51,6 +50,8 @@ const char list_rcs[] = "$Id: list.c,v 1.32 2014/11/14 10:39:49 fabiankeil Exp $
 #endif
 
 #include <assert.h>
+
+#include "config.h"
 
 #include "project.h"
 #include "list.h"

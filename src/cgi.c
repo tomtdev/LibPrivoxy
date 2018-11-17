@@ -36,8 +36,6 @@ const char cgi_rcs[] = "$Id: cgi.c,v 1.165 2016/05/03 13:22:30 fabiankeil Exp $"
  **********************************************************************/
 
 
-#include "config.h"
-
 #if defined( _WIN32 ) && defined( RES_IN_DLL )
 #include <windows.h>
 #endif
@@ -54,6 +52,8 @@ const char cgi_rcs[] = "$Id: cgi.c,v 1.165 2016/05/03 13:22:30 fabiankeil Exp $"
 #ifdef FEATURE_COMPRESSION
 #include <zlib.h>
 #endif
+
+#include "config.h"
 
 #include "project.h"
 #include "cgi.h"
