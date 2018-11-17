@@ -81,14 +81,14 @@ time_t timegm(struct tm *tm);
 
 /* Here's looking at you, Ulrich. */
 #if !defined(HAVE_STRLCPY)
-size_t privoxy_strlcpy(char *destination, const char *source, size_t size);
+size_t privoxy_strlcpy(char *destination, const char *source, const size_t size);
 #define strlcpy privoxy_strlcpy
 #define USE_PRIVOXY_STRLCPY 1
 #define HAVE_STRLCPY 1
 #endif /* ndef HAVE_STRLCPY*/
 
 #ifndef HAVE_STRLCAT
-size_t privoxy_strlcat(char *destination, const char *source, size_t size);
+size_t privoxy_strlcat(char *destination, const char *source, const size_t size);
 #define strlcat privoxy_strlcat
 #endif /* ndef HAVE_STRLCAT */
 

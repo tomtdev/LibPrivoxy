@@ -875,7 +875,7 @@ size_t privoxy_strlcat(char *destination, const char *source, const size_t size)
  *
  *********************************************************************/
 #ifdef _WIN32
-long get_timezone_diff_secs()
+time_t get_timezone_diff_secs()
 {
 	struct tm * timeinfo;
 	time_t secs, local_secs, gmt_secs;
