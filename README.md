@@ -39,9 +39,13 @@ You can let Privoxy listen to multiple ports, and forward client's requests to d
 <br/>
 <code>
 listen-address 127.0.0.1:8080
+
 listen-address 127.0.0.1:8081
+
 listen-address 127.0.0.1:8082
+
 forward-socks5 :8080 / 127.0.0.1:1080 .
+
 forward :8081 / 192.168.0.1:3128
 </code>
 <br/>
