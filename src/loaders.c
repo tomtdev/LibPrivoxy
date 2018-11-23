@@ -985,6 +985,7 @@ static void unload_re_filterfile(void *f)
  *********************************************************************/
 void unload_forward_spec(struct forward_spec *fwd)
 {
+   free_pattern_spec(fwd->listener);
    free_pattern_spec(fwd->url);
    freez(fwd->gateway_host);
    freez(fwd->forward_host);

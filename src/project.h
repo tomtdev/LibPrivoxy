@@ -1119,6 +1119,9 @@ struct block_spec
  */
 struct forward_spec
 {
+	/** Listener pattern that this forward_spec is for. */
+	struct pattern_spec listener[1];
+
    /** URL pattern that this forward_spec is for. */
    struct pattern_spec url[1];
 

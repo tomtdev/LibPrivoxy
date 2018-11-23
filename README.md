@@ -19,6 +19,11 @@ License: GNU GENERAL PUBLIC LICENSE Version 2
 Author: Shiyu Tang <shiyutang#gmail.com>
 <br/>
 <br/>
+Notice: Important changes to original Privoxy:
+<br/>
+<br/>
+1. Use custom DNS servers
+<br />
 You can set DNS servers in config file to use specified DNS servers (of example, 8.8.8.8 and/or 208.67.222.222) instead of system-wide DNS settings. You can add no more than 6 DNS servers. Like:
 <br/>
 <br/>
@@ -27,7 +32,28 @@ dns-servers 8.8.8.8;208.67.222.222
 </code>
 <br/>
 <br/>
-Sample code (C#):
+2. Choose different forward ways from listener's address
+<br/>
+You can let Privoxy listen to multiple ports, and forward client's requests to differnt proxies. Here is an example of config file:
+<br/>
+<br/>
+<code>
+listen-address 127.0.0.1:8080
+listen-address 127.0.0.1:8081
+listen-address 127.0.0.1:8082
+forward-socks5 :8080 / 127.0.0.1:1080 .
+forward :8081 / 192.168.0.1:3128
+</code>
+<br/>
+<br/>
+If a client set its http proxy to 127.0.0.1:8080, Privoxy will forward requests to parent SOCKS 5 proxy 127.0.0.1:1080;
+<br/>
+If a client set its http proxy to 127.0.0.1:8081, Privoxy will forward requests to parent HTTP proxy 192.168.0.1:3128;
+<br/>
+If a client set its http proxy to 127.0.0.1:8082, Privoxy will forward requests to Internet directly.
+<br/>
+<br/>
+Sample code (C#) of using the dll:
 <br/>
 <br/>
 <code>

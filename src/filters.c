@@ -2556,7 +2556,22 @@ const struct forward_spec *forward_url(struct client_state *csp,
    {
       if (url_match(fwd->url, http))
       {
-         return fwd;
+		  int go_fwd = 1;
+		  struct http_request listerner_to_query[1];
+		  memset(listerner_to_query, '\0', sizeof(listerner_to_query));
+		  jb_err err = parse_http_url(csp->listen_addr_str, listerner_to_query, 0);
+		  if (err)
+		  {
+			  go_fwd = 0;
+		  }
+
+		  go_fwd = url_match(fwd->listener, listerner_to_query);
+		  free_http_request(listerner_to_query);
+
+		  if (go_fwd)
+		  {
+			  return fwd;
+		  }
       }
       fwd = fwd->next;
    }

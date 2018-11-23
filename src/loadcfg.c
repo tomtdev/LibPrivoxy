@@ -221,6 +221,7 @@ static void unload_configfile (void * data)
    while (cur_fwd != NULL)
    {
       struct forward_spec * next_fwd = cur_fwd->next;
+	  free_pattern_spec(cur_fwd->listener);
       free_pattern_spec(cur_fwd->url);
 
       freez(cur_fwd->gateway_host);
@@ -654,7 +655,7 @@ struct configuration_spec * load_config(void)
 #endif /* def FEATURE_ACL */
       struct forward_spec *cur_fwd;
       int vec_count;
-      char *vec[3];
+      char *vec[4];
       unsigned int directive_hash;
 
       strlcpy(tmp, buf, sizeof(tmp));
@@ -1090,13 +1091,13 @@ struct configuration_spec * load_config(void)
             break;
 
 /* *************************************************************************
- * forward url-pattern (.|http-proxy-host[:port])
+ * forward listener-pattern url-pattern (.|http-proxy-host[:port])
  * *************************************************************************/
          case hash_forward:
             strlcpy(tmp, arg, sizeof(tmp));
             vec_count = ssplit(tmp, " \t", vec, SZ(vec));
 
-            if (vec_count != 2)
+            if (vec_count != 3)
             {
                log_error(LOG_LEVEL_ERROR, "Wrong number of parameters for forward "
                      "directive in configuration file.");
@@ -1110,8 +1111,20 @@ struct configuration_spec * load_config(void)
             cur_fwd = zalloc_or_die(sizeof(*cur_fwd));
             cur_fwd->type = SOCKS_NONE;
 
+			/* Save the listener pattern */
+			if (create_pattern_spec(cur_fwd->listener, vec[0]))
+			{
+				log_error(LOG_LEVEL_ERROR, "Bad URL specifier for forward "
+					"directive in configuration file.");
+				string_append(&config->proxy_args,
+					"<br>\nWARNING: Bad URL specifier for "
+					"forward directive in configuration file.");
+				freez(cur_fwd);
+				break;
+			}
+
             /* Save the URL pattern */
-            if (create_pattern_spec(cur_fwd->url, vec[0]))
+            if (create_pattern_spec(cur_fwd->url, vec[1]))
             {
                log_error(LOG_LEVEL_ERROR, "Bad URL specifier for forward "
                      "directive in configuration file.");
@@ -1123,66 +1136,6 @@ struct configuration_spec * load_config(void)
             }
 
             /* Parse the parent HTTP proxy host:port */
-            p = vec[1];
-
-            if (strcmp(p, ".") != 0)
-            {
-               cur_fwd->forward_port = 8000;
-               parse_forwarder_address(p, &cur_fwd->forward_host,
-                  &cur_fwd->forward_port);
-            }
-
-            /* Add to list. */
-            cur_fwd->next = config->forward;
-            config->forward = cur_fwd;
-
-            break;
-
-/* *************************************************************************
- * forward-socks4 url-pattern socks-proxy[:port] (.|http-proxy[:port])
- * *************************************************************************/
-         case hash_forward_socks4:
-            strlcpy(tmp, arg, sizeof(tmp));
-            vec_count = ssplit(tmp, " \t", vec, SZ(vec));
-
-            if (vec_count != 3)
-            {
-               log_error(LOG_LEVEL_ERROR, "Wrong number of parameters for "
-                     "forward-socks4 directive in configuration file.");
-               string_append(&config->proxy_args,
-                  "<br>\nWARNING: Wrong number of parameters for "
-                  "forward-socks4 directive in configuration file.");
-               break;
-            }
-
-            /* allocate a new node */
-            cur_fwd = zalloc_or_die(sizeof(*cur_fwd));
-            cur_fwd->type = SOCKS_4;
-
-            /* Save the URL pattern */
-            if (create_pattern_spec(cur_fwd->url, vec[0]))
-            {
-               log_error(LOG_LEVEL_ERROR, "Bad URL specifier for forward-socks4 "
-                     "directive in configuration file.");
-               string_append(&config->proxy_args,
-                  "<br>\nWARNING: Bad URL specifier for "
-                  "forward-socks4 directive in configuration file.");
-               freez(cur_fwd);
-               break;
-            }
-
-            /* Parse the SOCKS proxy host[:port] */
-            p = vec[1];
-
-            /* XXX: This check looks like a bug. */
-            if (strcmp(p, ".") != 0)
-            {
-               cur_fwd->gateway_port = 1080;
-               parse_forwarder_address(p, &cur_fwd->gateway_host,
-                  &cur_fwd->gateway_port);
-            }
-
-            /* Parse the parent HTTP proxy host[:port] */
             p = vec[2];
 
             if (strcmp(p, ".") != 0)
@@ -1199,7 +1152,79 @@ struct configuration_spec * load_config(void)
             break;
 
 /* *************************************************************************
- * forward-socks4a url-pattern socks-proxy[:port] (.|http-proxy[:port])
+ * forward-socks4 listener-pattern url-pattern socks-proxy[:port] (.|http-proxy[:port])
+ * *************************************************************************/
+         case hash_forward_socks4:
+            strlcpy(tmp, arg, sizeof(tmp));
+            vec_count = ssplit(tmp, " \t", vec, SZ(vec));
+
+            if (vec_count != 4)
+            {
+               log_error(LOG_LEVEL_ERROR, "Wrong number of parameters for "
+                     "forward-socks4 directive in configuration file.");
+               string_append(&config->proxy_args,
+                  "<br>\nWARNING: Wrong number of parameters for "
+                  "forward-socks4 directive in configuration file.");
+               break;
+            }
+
+            /* allocate a new node */
+            cur_fwd = zalloc_or_die(sizeof(*cur_fwd));
+            cur_fwd->type = SOCKS_4;
+
+			/* Save the listener pattern */
+			if (create_pattern_spec(cur_fwd->listener, vec[0]))
+			{
+				log_error(LOG_LEVEL_ERROR, "Bad URL specifier for forward-socks4 "
+					"directive in configuration file.");
+				string_append(&config->proxy_args,
+					"<br>\nWARNING: Bad URL specifier for "
+					"forward-socks4 directive in configuration file.");
+				freez(cur_fwd);
+				break;
+			}
+
+            /* Save the URL pattern */
+            if (create_pattern_spec(cur_fwd->url, vec[1]))
+            {
+               log_error(LOG_LEVEL_ERROR, "Bad URL specifier for forward-socks4 "
+                     "directive in configuration file.");
+               string_append(&config->proxy_args,
+                  "<br>\nWARNING: Bad URL specifier for "
+                  "forward-socks4 directive in configuration file.");
+               freez(cur_fwd);
+               break;
+            }
+
+            /* Parse the SOCKS proxy host[:port] */
+            p = vec[2];
+
+            /* XXX: This check looks like a bug. */
+            if (strcmp(p, ".") != 0)
+            {
+               cur_fwd->gateway_port = 1080;
+               parse_forwarder_address(p, &cur_fwd->gateway_host,
+                  &cur_fwd->gateway_port);
+            }
+
+            /* Parse the parent HTTP proxy host[:port] */
+            p = vec[3];
+
+            if (strcmp(p, ".") != 0)
+            {
+               cur_fwd->forward_port = 8000;
+               parse_forwarder_address(p, &cur_fwd->forward_host,
+                  &cur_fwd->forward_port);
+            }
+
+            /* Add to list. */
+            cur_fwd->next = config->forward;
+            config->forward = cur_fwd;
+
+            break;
+
+/* *************************************************************************
+ * forward-socks4a listener-pattern url-pattern socks-proxy[:port] (.|http-proxy[:port])
  * *************************************************************************/
          case hash_forward_socks4a:
          case hash_forward_socks5:
@@ -1207,7 +1232,7 @@ struct configuration_spec * load_config(void)
             strlcpy(tmp, arg, sizeof(tmp));
             vec_count = ssplit(tmp, " \t", vec, SZ(vec));
 
-            if (vec_count != 3)
+            if (vec_count != 4)
             {
                log_error(LOG_LEVEL_ERROR,
                   "Wrong number of parameters for %s in configuration file.",
@@ -1237,8 +1262,23 @@ struct configuration_spec * load_config(void)
                cur_fwd->type = SOCKS_5T;
             }
 
+			/* Save the listener pattern */
+			if (create_pattern_spec(cur_fwd->listener, vec[0]))
+			{
+				log_error(LOG_LEVEL_ERROR,
+					"Bad URL specifier for %s in configuration file.",
+					cmd);
+				string_append(&config->proxy_args,
+					"<br>\nWARNING: Bad URL specifier for ");
+				string_append(&config->proxy_args, cmd);
+				string_append(&config->proxy_args,
+					"directive in configuration file.");
+				freez(cur_fwd);
+				break;
+			}
+
             /* Save the URL pattern */
-            if (create_pattern_spec(cur_fwd->url, vec[0]))
+            if (create_pattern_spec(cur_fwd->url, vec[1]))
             {
                log_error(LOG_LEVEL_ERROR,
                   "Bad URL specifier for %s in configuration file.",
@@ -1253,14 +1293,14 @@ struct configuration_spec * load_config(void)
             }
 
             /* Parse the SOCKS proxy host[:port] */
-            p = vec[1];
+            p = vec[2];
 
             cur_fwd->gateway_port = 1080;
             parse_forwarder_address(p, &cur_fwd->gateway_host,
                &cur_fwd->gateway_port);
 
             /* Parse the parent HTTP proxy host[:port] */
-            p = vec[2];
+            p = vec[3];
 
             if (strcmp(p, ".") != 0)
             {
