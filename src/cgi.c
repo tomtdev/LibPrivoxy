@@ -922,7 +922,9 @@ struct http_response *error_response(struct client_state *csp,
    }
    else if (!strcmp(templatename, "forwarding-failed"))
    {
-      const struct forward_spec *fwd = forward_url(csp, csp->http);
+	  struct forward_spec const *fwds[MAX_FORWARD_URLS];
+	  int fwd_count = forward_url(csp, csp->http, fwds);
+      const struct forward_spec *fwd = fwds[0];
       char *socks_type = NULL;
       if (fwd == NULL)
       {

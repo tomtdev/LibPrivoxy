@@ -83,8 +83,9 @@ extern struct re_filterfile_spec *get_filter(const struct client_state *csp,
 /*
  * Determining parent proxies
  */
-extern const struct forward_spec *forward_url(struct client_state *csp,
-                                              const struct http_request *http);
+extern int forward_url(struct client_state *csp,
+                       const struct http_request *http,
+                       struct forward_spec const *fwds[MAX_FORWARD_URLS]);
 
 /*
  * Content modification

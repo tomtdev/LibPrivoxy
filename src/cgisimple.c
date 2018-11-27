@@ -1535,7 +1535,9 @@ jb_err cgi_show_url_info(struct client_state *csp,
        * display the proxy port and an eventual second forwarder.
        */
       {
-         const struct forward_spec *fwd = forward_url(csp, url_to_query);
+		 struct forward_spec const *fwds[MAX_FORWARD_URLS];
+		 int fwd_count = forward_url(csp, url_to_query, fwds);
+         const struct forward_spec *fwd = fwds[0];
 
          if ((fwd->gateway_host == NULL) && (fwd->forward_host == NULL))
          {

@@ -2532,27 +2532,32 @@ static const struct forward_spec *get_forward_override_settings(struct client_st
  * Parameters  :
  *          1  :  csp = Current client state (buffers, headers, etc...)
  *          2  :  http = http_request request for current URL
+ *          3  :  fwds = all result URLs that can be used to forward
  *
- * Returns     :  Pointer to forwarding information.
+ * Returns     :  Count of all forward URLs.
  *
  *********************************************************************/
-const struct forward_spec *forward_url(struct client_state *csp,
-                                       const struct http_request *http)
+int forward_url(struct client_state *csp,
+                const struct http_request *http,
+                struct forward_spec const *fwds[MAX_FORWARD_URLS])
 {
    static const struct forward_spec fwd_default[1]; /* Zero'ed due to being static. */
    struct forward_spec *fwd = csp->config->forward;
 
    if (csp->action->flags & ACTION_FORWARD_OVERRIDE)
    {
-      return get_forward_override_settings(csp);
+	  fwds[0] = get_forward_override_settings(csp);
+      return 1;
    }
 
    if (fwd == NULL)
    {
-      return fwd_default;
+	  fwds[0] = fwd_default;
+      return 1;
    }
 
-   while (fwd != NULL)
+   int i = 0;
+   while (fwd != NULL && i < MAX_FORWARD_URLS)
    {
       if (url_match(fwd->url, http))
       {
@@ -2570,13 +2575,21 @@ const struct forward_spec *forward_url(struct client_state *csp,
 
 		  if (go_fwd)
 		  {
-			  return fwd;
+			  fwds[i] = fwd;
+			  ++i;
 		  }
       }
       fwd = fwd->next;
    }
 
-   return fwd_default;
+   if (i == 0) {
+	  fwds[0] = fwd_default;
+	  return 1;
+   }
+   else 
+   {
+	  return i;
+   }
 }
 
 

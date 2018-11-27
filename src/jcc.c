@@ -1872,7 +1872,9 @@ static void chat(struct client_state *csp)
    }
 
    /* decide how to route the HTTP request */
-   fwd = forward_url(csp, http);
+   struct forward_spec const *fwds[MAX_FORWARD_URLS];
+   int fwd_count = forward_url(csp, http, fwds);
+   fwd = fwds[0];
    if (NULL == fwd)
    {
       log_error(LOG_LEVEL_FATAL, "gateway spec is NULL!?!?  This can't happen!");

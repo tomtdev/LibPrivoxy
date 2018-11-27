@@ -1277,6 +1277,10 @@ struct client_tag_spec
 #define RUNTIME_FEATURE_FORWARD_PROXY_AUTHENTICATION_HEADERS      4096U
 
 #define MAX_DNS_SERVERS 6
+
+#define MAX_FORWARD_URLS 6
+
+#define FORWARD_CONNECT_TIMEOUT 3
 /**
  * Data loaded from the configuration file.
  *

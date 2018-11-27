@@ -559,7 +559,8 @@ static jb_socket no_rfc2553_connect_to(const char *host, int portnum, struct cli
 	FD_ZERO(&wfds);
 	FD_SET(fd, &wfds);
 
-	tv->tv_sec = 30;
+	tv->tv_sec = FORWARD_CONNECT_TIMEOUT;
+	/* tv->tv_sec = 30; */
 	tv->tv_usec = 0;
 
 	/* MS Windows uses int, not SOCKET, for the 1st arg of select(). Weird! */
