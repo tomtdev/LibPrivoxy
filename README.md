@@ -4,7 +4,7 @@ Many people want to integrate Privoxy into their own projects, I made some chang
 <br/>
 Base on work from:
 <br/>
-Privoxy: https://www.privoxy.org/ (based on its latest version 3.0.26)
+Privoxy: https://www.privoxy.org/ (based on its latest version 3.0.28)
 <br/>
 LibPrivoxy: https://github.com/tarolabs/LibPrivoxy
 <br/>
@@ -30,31 +30,6 @@ You can set DNS servers in config file to use specified DNS servers (of example,
 <code>
 dns-servers 8.8.8.8;208.67.222.222
 </code>
-<br/>
-<br/>
-2. Choose different forward ways from listener's address
-<br/>
-You can let Privoxy listen to multiple ports, and forward client's requests to differnt proxies. Here is an example of config file:
-<br/>
-<br/>
-<code>
-listen-address 127.0.0.1:8080
-
-listen-address 127.0.0.1:8081
-
-listen-address 127.0.0.1:8082
-
-forward-socks5 :8080 / 127.0.0.1:1080 .
-
-forward :8081 / 192.168.0.1:3128
-</code>
-<br/>
-<br/>
-If a client set its http proxy to 127.0.0.1:8080, Privoxy will forward requests to parent SOCKS 5 proxy 127.0.0.1:1080;
-<br/>
-If a client set its http proxy to 127.0.0.1:8081, Privoxy will forward requests to parent HTTP proxy 192.168.0.1:3128;
-<br/>
-If a client set its http proxy to 127.0.0.1:8082, Privoxy will forward requests to Internet directly.
 <br/>
 <br/>
 Sample code (C#) of using the dll:
