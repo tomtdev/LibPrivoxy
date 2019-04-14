@@ -1,11 +1,9 @@
 <!--
- File        :  $Source: /cvsroot/ijbswa/current/doc/source/p-authors.sgml,v $
+ File        :  doc/source/p-authors.sgml
 
  Purpose     :  Entity included in other project documents.
 
- $Id: p-authors.sgml,v 2.78 2016/08/22 14:50:29 fabiankeil Exp $
-
- Copyright (C) 2001-2013 Privoxy Developers https://www.privoxy.org/
+ Copyright (C) 2001-2018 Privoxy Developers https://www.privoxy.org/
  See LICENSE.
 
  ======================================================================
@@ -32,7 +30,6 @@ Current Privoxy Team:
 <literallayout>
  Fabian Keil, lead developer
  David Schmidt
- Hal Burgiss
  Lee Rian
  Roland Rosenfeld
  Ian Silvester
@@ -47,13 +44,14 @@ Current Privoxy Team:
  Johny Agotnes
  Rodrigo Barbosa
  Moritz Barsnick
+ Hal Burgiss
  Ian Cummings
  Brian Dessent
  Jon Foster
  Karsten Hopp
  Alexander Lazic
  Daniel Leite
- Gábor Lipták
+ G&aacute;bor Lipt&aacute;k
  Adam Lock
  Guy Laroche
  Justin McMurtry
@@ -63,7 +61,7 @@ Current Privoxy Team:
  Haroon Rafique
  Georg Sauthoff
  Thomas Steudten
- Jörg Strohmayer
+ J&ouml;rg Strohmayer
  Rodney Stromlund
  Sviatoslav Sviridov
  Sarantis Paskalis
@@ -78,11 +76,13 @@ Current Privoxy Team:
 </para>
 <literallayout>
  Rustam Abdullaev
+ Clint Adams
  Anatoly Arzhnikov
  Ken Arromdee
  Natxo Asenjo
  Devin Bayer
  Havard Berland
+ David Binderman
  David Bo
  Gergely Bor
  Francois Botha
@@ -95,7 +95,7 @@ Current Privoxy Team:
  Sam Chen
  Ramkumar Chinchani
  Billy Crook
- Frédéric Crozat
+ Fr&eacute;d&eacute;ric Crozat
  Matthew Daley
  Michael T. Davis
  Markus Dittrich
@@ -109,19 +109,20 @@ Current Privoxy Team:
  Dean Gaudet
  Stephen Gildea
  John McGowan
+ Danny Goossen
  Lizik Grelier
  Daniel Griscom
- Felix Gröbert
+ Felix Gr&ouml;bert
  Bernard Guillot
  Jeff H.
  Tim H.
  Aaron Hamid
- Basil Hussain
  Darel Henman
  Magnus Holmgren
  Eric M. Hopper
  Ralf Horstmann
  Stefan Huehner
+ Basil Hussain
  Peter Hyman
  Derek Jennings
  Andrew Jones
@@ -146,17 +147,18 @@ Current Privoxy Team:
  Angelina Matson
  Jonathan McKenzie
  David Mediavilla
- J. Momberger
  Raphael Moll
+ J. Momberger
  Mathew Murphy
  Amuro Namie
  Mark Nelson
+ Tobias Netzel
  Adam Piggott
- Petr Písar
+ Petr P&iacute;sar
  Dan Price
- Kai Raven
  Roberto Ragusa
- Félix Rauch
+ F&eacute;lix Rauch
+ Kai Raven
  Marvin Renich
  Chris John Riley
  Maynard Riley
@@ -165,6 +167,7 @@ Current Privoxy Team:
  Gregory Seidman
  Atman Sense
  Chung-chieh Shan
+ Johan Sintorn
  Benjamin C. Wiley Sittler
  Simon South
  Dan Stahlke
@@ -172,6 +175,7 @@ Current Privoxy Team:
  Rick Sykes
  Spinor S.
  Peter Thoenen
+ Marc Thomas
  Martin Thomas
  Reuben Thomas
  Guybrush Threepwood
@@ -181,14 +185,15 @@ Current Privoxy Team:
  David Wagner
  Glenn Washburn
  Song Weijia
- Jörg Weinmann
+ J&ouml;rg Weinmann
  Darren Wiebe
  Anduin Withers
+ Eduard Wulff
  Yang Xia
  Jarry Xu
  Oliver Yeoh
+ Yossi Zahn
  Jamie Zawinski
- Eduard Wulff
 </literallayout>
 
 <para>

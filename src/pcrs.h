@@ -11,8 +11,6 @@
  *
  *********************************************************************/
 
-#define PCRS_H_VERSION "$Id: pcrs.h,v 1.18 2013/11/24 14:23:28 fabiankeil Exp $"
-
 
 #ifndef _PCRE_H
 #include <pcre.h>
@@ -132,6 +130,10 @@ extern pcrs_job *pcrs_compile_dynamic_command(char *pcrs_command, const struct p
 #ifndef PCRS_BUFFER_SIZE
 #define PCRS_BUFFER_SIZE 4000
 #endif /* ndef PCRS_BUFFER_SIZE */
+
+#ifdef FUZZ
+extern pcrs_substitute *pcrs_compile_fuzzed_replacement(const char *replacement, int *errptr);
+#endif
 
 #endif /* ndef PCRS_H_INCLUDED */
 

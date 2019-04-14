@@ -18,8 +18,6 @@
 # Only convert your files once, or, as RoboCop used to say,
 # there will be... trouble.
 #
-# $Id: url-pattern-translator.pl,v 1.4 2009/06/21 18:15:24 fabiankeil Exp $
-#
 # Copyright (c) 2008 Fabian Keil <fk@fabiankeil.de>
 #
 # Permission to use, copy, modify, and distribute this software for any

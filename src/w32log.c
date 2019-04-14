@@ -1,4 +1,3 @@
-const char w32log_rcs[] = "$Id: w32log.c,v 1.52 2016/07/28 00:38:47 ler762 Exp $";
 /*********************************************************************
  *
  * File        :  $Source: /cvsroot/ijbswa/current/w32log.c,v $
@@ -41,6 +40,7 @@ const char w32log_rcs[] = "$Id: w32log.c,v 1.52 2016/07/28 00:38:47 ler762 Exp $
 #ifndef STRICT
 #define STRICT
 #endif
+#include <winsock2.h>
 #include <windows.h>
 #include <richedit.h>
 
@@ -53,15 +53,6 @@ const char w32log_rcs[] = "$Id: w32log.c,v 1.52 2016/07/28 00:38:47 ler762 Exp $
 #include "miscutil.h"
 #include "errlog.h"
 #include "loadcfg.h"
-
-const char w32res_h_rcs[] = W32RES_H_VERSION;
-
-#ifdef __MINGW32__
-#include "cygwin.h"
-const char cygwin_h_rcs[] = CYGWIN_H_VERSION;
-#endif
-
-const char w32log_h_rcs[] = W32LOG_H_VERSION;
 
 #ifndef _WIN_CONSOLE /* entire file */
 

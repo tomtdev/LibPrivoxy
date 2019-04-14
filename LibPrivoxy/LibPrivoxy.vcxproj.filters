@@ -82,7 +82,6 @@
     <None Include="..\src\templates\show-status" />
     <None Include="..\src\templates\show-status-file" />
     <None Include="..\src\templates\show-url-info" />
-    <None Include="..\src\templates\show-version" />
     <None Include="..\src\templates\toggle" />
     <None Include="..\src\templates\toggle-mini" />
     <None Include="..\src\templates\untrusted" />
@@ -189,9 +188,6 @@
     <ClInclude Include="..\src\actions.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\src\amiga.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="..\src\pcre\pcreposix.h">
       <Filter>pcre</Filter>
     </ClInclude>
@@ -293,13 +289,7 @@
     <ClCompile Include="..\src\actions.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\amiga.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="..\src\pcre\study.c">
-      <Filter>pcre</Filter>
-    </ClCompile>
-    <ClCompile Include="..\src\pcre\chartables.c">
       <Filter>pcre</Filter>
     </ClCompile>
     <ClCompile Include="..\src\pcre\get.c">
@@ -325,6 +315,12 @@
     </ClCompile>
     <ClCompile Include="stdafx.c">
       <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\fuzz.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\pcre\chartables.c">
+      <Filter>pcre</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

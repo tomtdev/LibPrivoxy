@@ -1,4 +1,3 @@
-const char filters_rcs[] = "$Id: filters.c,v 1.202 2016/05/25 10:50:55 fabiankeil Exp $";
 /*********************************************************************
  *
  * File        :  $Source: /cvsroot/ijbswa/current/filters.c,v $
@@ -33,6 +32,8 @@ const char filters_rcs[] = "$Id: filters.c,v 1.202 2016/05/25 10:50:55 fabiankei
  *********************************************************************/
 
 
+#include "config.h"
+
 #include <stdio.h>
 #include <sys/types.h>
 #include <stdlib.h>
@@ -52,8 +53,6 @@ const char filters_rcs[] = "$Id: filters.c,v 1.202 2016/05/25 10:50:55 fabiankei
 #ifdef __OS2__
 #include <utils.h>
 #endif /* def __OS2__ */
-
-#include "config.h"
 
 #include "project.h"
 #include "filters.h"
@@ -78,11 +77,8 @@ const char filters_rcs[] = "$Id: filters.c,v 1.202 2016/05/25 10:50:55 fabiankei
 #include "win32.h"
 #endif
 
-const char filters_h_rcs[] = FILTERS_H_VERSION;
-
 typedef char *(*filter_function_ptr)();
 static filter_function_ptr get_filter_function(const struct client_state *csp);
-static jb_err remove_chunked_transfer_coding(char *buffer, size_t *size);
 static jb_err prepare_for_filtering(struct client_state *csp);
 static void apply_url_actions(struct current_action_spec *action,
                               struct http_request *http,
@@ -106,17 +102,15 @@ static void apply_url_actions(struct current_action_spec *action,
  *          3  :  len  = length of IP address in octets
  *          4  :  port = port number in network order;
  *
- * Returns     :  0 = no errror; -1 otherwise.
+ * Returns     :  void
  *
  *********************************************************************/
-static int sockaddr_storage_to_ip(const struct sockaddr_storage *addr,
-                                  uint8_t **ip, unsigned int *len,
-                                  in_port_t **port)
+static void sockaddr_storage_to_ip(const struct sockaddr_storage *addr,
+                                   uint8_t **ip, unsigned int *len,
+                                   in_port_t **port)
 {
-   if (NULL == addr)
-   {
-      return(-1);
-   }
+   assert(NULL != addr);
+   assert(addr->ss_family == AF_INET || addr->ss_family == AF_INET6);
 
    switch (addr->ss_family)
    {
@@ -151,12 +145,7 @@ static int sockaddr_storage_to_ip(const struct sockaddr_storage *addr,
          }
          break;
 
-      default:
-         /* Unsupported address family */
-         return(-1);
    }
-
-   return(0);
 }
 
 
@@ -456,10 +445,7 @@ int acl_addr(const char *aspec, struct access_control_addr *aca)
    }
 
    aca->mask.ss_family = aca->addr.ss_family;
-   if (sockaddr_storage_to_ip(&aca->mask, &mask_data, &addr_len, &mask_port))
-   {
-      return(-1);
-   }
+   sockaddr_storage_to_ip(&aca->mask, &mask_data, &addr_len, &mask_port);
 
    if (p)
    {
@@ -1069,7 +1055,7 @@ char *get_last_url(char *subject, const char *redirect_mode)
    }
 
    if (0 == strcmpic(redirect_mode, "check-decoded-url") && strchr(subject, '%'))
-   {  
+   {
       char *url_segment = NULL;
       char **url_segments;
       size_t max_segments;
@@ -1328,42 +1314,18 @@ struct http_response *redirect_url(struct client_state *csp)
  *
  * Function    :  is_imageurl
  *
- * Description :  Given a URL, decide whether it is an image or not,
- *                using either the info from a previous +image action
- *                or, #ifdef FEATURE_IMAGE_DETECT_MSIE, and the browser
- *                is MSIE and not on a Mac, tell from the browser's accept
- *                header.
+ * Description :  Given a URL, decide whether it should be treated
+ *                as image URL or not.
  *
  * Parameters  :
  *          1  :  csp = Current client state (buffers, headers, etc...)
  *
- * Returns     :  True (nonzero) if URL is an image, false (0)
+ * Returns     :  True (nonzero) if URL is an image URL, false (0)
  *                otherwise
  *
  *********************************************************************/
 int is_imageurl(const struct client_state *csp)
 {
-#ifdef FEATURE_IMAGE_DETECT_MSIE
-   char *tmp;
-
-   tmp = get_header_value(csp->headers, "User-Agent:");
-   if (tmp && strstr(tmp, "MSIE") && !strstr(tmp, "Mac_"))
-   {
-      tmp = get_header_value(csp->headers, "Accept:");
-      if (tmp && strstr(tmp, "image/gif"))
-      {
-         /* Client will accept HTML.  If this seems counterintuitive,
-          * blame Microsoft.
-          */
-         return(0);
-      }
-      else
-      {
-         return(1);
-      }
-   }
-#endif /* def FEATURE_IMAGE_DETECT_MSIE */
-
    return ((csp->action->flags & ACTION_IMAGE) != 0);
 
 }
@@ -1957,7 +1919,11 @@ static char *execute_external_filter(const struct client_state *csp,
  *                or NULL in case something went wrong.
  *
  *********************************************************************/
+#ifdef FUZZ
+char *gif_deanimate_response(struct client_state *csp)
+#else
 static char *gif_deanimate_response(struct client_state *csp)
+#endif
 {
    struct binbuffer *in, *out;
    char *p;
@@ -2055,12 +2021,22 @@ static filter_function_ptr get_filter_function(const struct client_state *csp)
  *                JB_ERR_PARSE otherwise
  *
  *********************************************************************/
+#ifdef FUZZ
+extern jb_err remove_chunked_transfer_coding(char *buffer, size_t *size)
+#else
 static jb_err remove_chunked_transfer_coding(char *buffer, size_t *size)
+#endif
 {
    size_t newsize = 0;
    unsigned int chunksize = 0;
    char *from_p, *to_p;
    const char *end_of_buffer = buffer + *size;
+
+   if (*size == 0)
+   {
+      log_error(LOG_LEVEL_FATAL, "Invalid chunked input. Buffer is empty.");
+      return JB_ERR_PARSE;
+   }
 
    assert(buffer);
    from_p = to_p = buffer;
@@ -2532,64 +2508,36 @@ static const struct forward_spec *get_forward_override_settings(struct client_st
  * Parameters  :
  *          1  :  csp = Current client state (buffers, headers, etc...)
  *          2  :  http = http_request request for current URL
- *          3  :  fwds = all result URLs that can be used to forward
  *
- * Returns     :  Count of all forward URLs.
+ * Returns     :  Pointer to forwarding information.
  *
  *********************************************************************/
-int forward_url(struct client_state *csp,
-                const struct http_request *http,
-                struct forward_spec const *fwds[MAX_FORWARD_URLS])
+const struct forward_spec *forward_url(struct client_state *csp,
+                                       const struct http_request *http)
 {
    static const struct forward_spec fwd_default[1]; /* Zero'ed due to being static. */
    struct forward_spec *fwd = csp->config->forward;
 
    if (csp->action->flags & ACTION_FORWARD_OVERRIDE)
    {
-	  fwds[0] = get_forward_override_settings(csp);
-      return 1;
+      return get_forward_override_settings(csp);
    }
 
    if (fwd == NULL)
    {
-	  fwds[0] = fwd_default;
-      return 1;
+      return fwd_default;
    }
 
-   int i = 0;
-   while (fwd != NULL && i < MAX_FORWARD_URLS)
+   while (fwd != NULL)
    {
       if (url_match(fwd->url, http))
       {
-		  int go_fwd = 1;
-		  struct http_request listerner_to_query[1];
-		  memset(listerner_to_query, '\0', sizeof(listerner_to_query));
-		  jb_err err = parse_http_url(csp->listen_addr_str, listerner_to_query, 0);
-		  if (err)
-		  {
-			  go_fwd = 0;
-		  }
-
-		  go_fwd = url_match(fwd->listener, listerner_to_query);
-		  free_http_request(listerner_to_query);
-
-		  if (go_fwd)
-		  {
-			  fwds[i] = fwd;
-			  ++i;
-		  }
+         return fwd;
       }
       fwd = fwd->next;
    }
 
-   if (i == 0) {
-	  fwds[0] = fwd_default;
-	  return 1;
-   }
-   else 
-   {
-	  return i;
-   }
+   return fwd_default;
 }
 
 

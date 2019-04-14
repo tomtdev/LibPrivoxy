@@ -1,6 +1,5 @@
 #ifndef ENCODE_H_INCLUDED
 #define ENCODE_H_INCLUDED
-#define ENCODE_H_VERSION "$Id: encode.h,v 1.13 2013/11/24 14:23:28 fabiankeil Exp $"
 /*********************************************************************
  *
  * File        :  $Source: /cvsroot/ijbswa/current/encode.h,v $
@@ -8,7 +7,7 @@
  * Purpose     :  Functions to encode and decode URLs, and also to
  *                encode cookies and HTML text.
  *
- * Copyright   :  Written by and Copyright (C) 2001 the SourceForge
+ * Copyright   :  Written by and Copyright (C) 2001 members of the
  *                Privoxy team. http://www.privoxy.org/
  *
  *                Based on the Internet Junkbuster originally written
@@ -42,10 +41,6 @@ extern char * url_decode(const char *str);
 extern int    xtoi(const char *s);
 extern char * html_encode_and_free_original(char *s);
 extern char * percent_encode_url(const char *s);
-
-/* Revision control strings from this header and associated .c file */
-extern const char encode_rcs[];
-extern const char encode_h_rcs[];
 
 #endif /* ndef ENCODE_H_INCLUDED */
 

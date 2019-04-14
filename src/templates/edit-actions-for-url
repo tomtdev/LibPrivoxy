@@ -7,7 +7,7 @@
 #
 #
 # Copyright   :  Written by and Copyright (C) 2001-2014 the
-#                Privoxy team. http://www.privoxy.org/
+#                Privoxy team. https://www.privoxy.org/
 #
 #                Original Author: Copyright (C) 2001 Jonathan Foster
 #                http://www.jon-foster.co.uk/
@@ -514,6 +514,28 @@ function show_limit_connect_opts(tf)
         type="radio" name="deanimate_gifs_mode" value="last"
         id="deanimate_last" @deanimate-gifs-param-last@><label
         for="deanimate_last">last frame</label></td>
+    </tr>
+    <tr class="bg1" align="left" valign="top">
+      <td class="en1" align="center" valign="middle"><input type="radio"
+        name="delay_response" value="Y" @delay-response-y@
+        ></td>
+      <td class="dis1" align="center" valign="middle"><input type="radio"
+        name="delay_response" value="N" @delay-response-n@
+        ></td>
+      <td class="noc1" align="center" valign="middle"><input type="radio"
+        name="delay_response" value="X" @delay-response-x@
+        ></td>
+      <td class="action"><a href="@user-manual@@actions-help-prefix@DELAY-RESPONSE">delay-response</a></td>
+      <td>Send the response in ca. 10 byte chunks and delay each chunk.</td>
+    </tr>
+    <tr class="bg1" align="left" valign="top" id="delay-response_opts">
+      <td class="en1">&nbsp;</td>
+      <td class="dis1">&nbsp;</td>
+      <td class="noc1">&nbsp;</td>
+      <td>&nbsp;</td>
+      <td>Number of milliseconds to delay chunks:<br>
+        <input type="text" name="delay_response_mode" size="40" value="@delay-response-param@">
+      </td>
     </tr>
     <tr class="bg1" align="left" valign="top">
       <td class="en1" align="center" valign="middle"><input type="radio"
@@ -1166,14 +1188,6 @@ function show_limit_connect_opts(tf)
       </td>
     </tr>
 
-    <tr>
-      <td class="info">
-
-#include mod-support-and-service
-
-      </td>
-    </tr>
-
 <!-- @if-have-help-info-start -->
     <tr>
       <td class="info">
@@ -1183,6 +1197,14 @@ function show_limit_connect_opts(tf)
       </td>
     </tr>
 <!-- if-have-help-info-end@ -->
+
+    <tr>
+      <td class="info">
+
+#include mod-support-and-service
+
+      </td>
+    </tr>
 
   </table>
 <!-- @if-one-form-only-start -->

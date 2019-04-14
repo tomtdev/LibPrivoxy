@@ -1,9 +1,7 @@
 # ********************************************************************
 # 
-#  File        :  $Source: /cvsroot/ijbswa/current/user.filter,v $
+#  File        :  user.filter
 # 
-#  $Id: user.filter,v 1.4 2016/05/25 10:50:55 fabiankeil Exp $
-#
 #  Purpose     :  Rules to process the content of web pages
 # 
 #  Copyright   :  Written by and Copyright (C) 2006-2008 the

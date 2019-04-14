@@ -1,4 +1,3 @@
-const char loadcfg_rcs[] = "$Id: loadcfg.c,v 1.153 2016/05/22 12:43:07 fabiankeil Exp $";
 /*********************************************************************
  *
  * File        :  $Source: /cvsroot/ijbswa/current/loadcfg.c,v $
@@ -8,7 +7,7 @@ const char loadcfg_rcs[] = "$Id: loadcfg.c,v 1.153 2016/05/22 12:43:07 fabiankei
  *                routine to load the configuration and the global
  *                variables it writes to.
  *
- * Copyright   :  Written by and Copyright (C) 2001-2016 the
+ * Copyright   :  Written by and Copyright (C) 2001-2017 the
  *                Privoxy team. http://www.privoxy.org/
  *
  *                Based on the Internet Junkbuster originally written
@@ -36,6 +35,7 @@ const char loadcfg_rcs[] = "$Id: loadcfg.c,v 1.153 2016/05/22 12:43:07 fabiankei
  *********************************************************************/
 
 
+#include "config.h"
 
 #include <stdio.h>
 #include <sys/types.h>
@@ -52,6 +52,7 @@ const char loadcfg_rcs[] = "$Id: loadcfg.c,v 1.153 2016/05/22 12:43:07 fabiankei
 # ifndef STRICT
 #  define STRICT
 # endif
+# include <winsock2.h>
 # include <windows.h>
 
 # include "win32.h"
@@ -71,8 +72,6 @@ const char loadcfg_rcs[] = "$Id: loadcfg.c,v 1.153 2016/05/22 12:43:07 fabiankei
 
 #endif
 
-#include "config.h"
-
 #include "project.h"
 #include "loadcfg.h"
 #include "list.h"
@@ -90,7 +89,16 @@ const char loadcfg_rcs[] = "$Id: loadcfg.c,v 1.153 2016/05/22 12:43:07 fabiankei
 #include "client-tags.h"
 #endif
 
-const char loadcfg_h_rcs[] = LOADCFG_H_VERSION;
+/*
+ * Default number of seconds after which an
+ * open connection will no longer be reused.
+ */
+#define DEFAULT_KEEP_ALIVE_TIMEOUT 180
+
+/*
+ * Default backlog passed to listen().
+ */
+#define DEFAULT_LISTEN_BACKLOG 128
 
 #ifdef FEATURE_TOGGLE
 /* Privoxy is enabled by default. */
@@ -137,6 +145,7 @@ static struct file_list *current_configfile = NULL;
 #define hash_default_server_timeout      2530089913U /* "default-server-timeout" */
 #define hash_deny_access                 1227333715U /* "deny-access" */
 #define hash_dns_servers				 1242045460U /* "dns-servers" */
+#define hash_enable_accept_filter        2909040407U /* "enable-accept-filter" */
 #define hash_enable_edit_actions         2517097536U /* "enable-edit-actions" */
 #define hash_enable_compression          3943696946U /* "enable-compression" */
 #define hash_enable_proxy_authentication_forwarding 4040610791U /* enable-proxy-authentication-forwarding */
@@ -154,11 +163,13 @@ static struct file_list *current_configfile = NULL;
 #define hash_hostname                      10308071U /* "hostname" */
 #define hash_keep_alive_timeout          3878599515U /* "keep-alive-timeout" */
 #define hash_listen_address              1255650842U /* "listen-address" */
+#define hash_listen_backlog              1255655735U /* "listen-backlog" */
 #define hash_logdir                          422889U /* "logdir" */
 #define hash_logfile                        2114766U /* "logfile" */
 #define hash_max_client_connections      3595884446U /* "max-client-connections" */
 #define hash_permit_access               3587953268U /* "permit-access" */
 #define hash_proxy_info_url              3903079059U /* "proxy-info-url" */
+#define hash_receive_buffer_size         2880297454U /* "receive-buffer-size */
 #define hash_single_threaded             4250084780U /* "single-threaded" */
 #define hash_socket_timeout              1809001761U /* "socket-timeout" */
 #define hash_split_large_cgi_forms        671658948U /* "split-large-cgi-forms" */
@@ -169,6 +180,7 @@ static struct file_list *current_configfile = NULL;
 #define hash_toggle                          447966U /* "toggle" */
 #define hash_trust_info_url               430331967U /* "trust-info-url" */
 #define hash_trust_x_forwarded_for       2971537414U /* "trust-x-forwarded-for" */
+#define hash_trusted_cgi_referrer        4270883427U /* "trusted-cgi-referrer" */
 #define hash_trustfile                     56494766U /* "trustfile" */
 #define hash_usermanual                  1416668518U /* "user-manual" */
 #define hash_activity_animation          1817904738U /* "activity-animation" */
@@ -221,7 +233,6 @@ static void unload_configfile (void * data)
    while (cur_fwd != NULL)
    {
       struct forward_spec * next_fwd = cur_fwd->next;
-	  free_pattern_spec(cur_fwd->listener);
       free_pattern_spec(cur_fwd->url);
 
       freez(cur_fwd->gateway_host);
@@ -263,6 +274,7 @@ static void unload_configfile (void * data)
    freez(config->proxy_info_url);
    freez(config->proxy_args);
    freez(config->usermanual);
+   freez(config->trusted_cgi_referrer);
 
 #ifdef FEATURE_TRUST
    freez(config->trustfile);
@@ -601,13 +613,19 @@ struct configuration_spec * load_config(void)
     */
    config->multi_threaded            = 1;
    config->buffer_limit              = 4096 * 1024;
-   config->usermanual                = strdup(USER_MANUAL_URL);
-   config->proxy_args                = strdup("");
+   config->receive_buffer_size       = BUFFER_SIZE;
+   config->usermanual                = strdup_or_die(USER_MANUAL_URL);
+   config->proxy_args                = strdup_or_die("");
    config->forwarded_connect_retries = 0;
 #ifdef FEATURE_CLIENT_TAGS
    config->client_tag_lifetime       = 60;
 #endif
    config->trust_x_forwarded_for     = 0;
+#if defined(FEATURE_ACCEPT_FILTER) && defined(SO_ACCEPTFILTER)
+   config->enable_accept_filter      = 0;
+#endif
+   config->listen_backlog            = DEFAULT_LISTEN_BACKLOG;
+   config->trusted_cgi_referrer      = NULL;
    /*
     * 128 client sockets ought to be enough for everybody who can't
     * be bothered to read the documentation to figure out how to
@@ -655,7 +673,7 @@ struct configuration_spec * load_config(void)
 #endif /* def FEATURE_ACL */
       struct forward_spec *cur_fwd;
       int vec_count;
-      char *vec[4];
+      char *vec[3];
       unsigned int directive_hash;
 
       strlcpy(tmp, buf, sizeof(tmp));
@@ -717,7 +735,7 @@ struct configuration_spec * load_config(void)
                   "(You can increase this limit by changing MAX_AF_FILES in project.h and recompiling).",
                   MAX_AF_FILES);
             }
-            config->actions_file_short[i] = strdup(arg);
+            config->actions_file_short[i] = strdup_or_die(arg);
             config->actions_file[i] = make_path(config->confdir, arg);
 
             break;
@@ -740,7 +758,7 @@ struct configuration_spec * load_config(void)
  * *************************************************************************/
          case hash_admin_address :
             freez(config->admin_address);
-            config->admin_address = strdup(arg);
+            config->admin_address = strdup_or_die(arg);
             break;
 
 /* *************************************************************************
@@ -973,6 +991,15 @@ struct configuration_spec * load_config(void)
             break;
 #endif /* def FEATURE_ACL */
 
+#if defined(FEATURE_ACCEPT_FILTER) && defined(SO_ACCEPTFILTER)
+/* *************************************************************************
+ * enable-accept-filter 0|1
+ * *************************************************************************/
+         case hash_enable_accept_filter :
+            config->enable_accept_filter = parse_toggle_state(cmd, arg);
+            break;
+#endif /* defined(FEATURE_ACCEPT_FILTER) && defined(SO_ACCEPTFILTER) */
+
 /* *************************************************************************
  * enable-edit-actions 0|1
  * *************************************************************************/
@@ -1085,19 +1112,19 @@ struct configuration_spec * load_config(void)
                   "(You can increase this limit by changing MAX_AF_FILES in project.h and recompiling).",
                   MAX_AF_FILES);
             }
-            config->re_filterfile_short[i] = strdup(arg);
+            config->re_filterfile_short[i] = strdup_or_die(arg);
             config->re_filterfile[i] = make_path(config->confdir, arg);
 
             break;
 
 /* *************************************************************************
- * forward listener-pattern url-pattern (.|http-proxy-host[:port])
+ * forward url-pattern (.|http-proxy-host[:port])
  * *************************************************************************/
          case hash_forward:
             strlcpy(tmp, arg, sizeof(tmp));
             vec_count = ssplit(tmp, " \t", vec, SZ(vec));
 
-            if (vec_count != 3)
+            if (vec_count != 2)
             {
                log_error(LOG_LEVEL_ERROR, "Wrong number of parameters for forward "
                      "directive in configuration file.");
@@ -1111,20 +1138,8 @@ struct configuration_spec * load_config(void)
             cur_fwd = zalloc_or_die(sizeof(*cur_fwd));
             cur_fwd->type = SOCKS_NONE;
 
-			/* Save the listener pattern */
-			if (create_pattern_spec(cur_fwd->listener, vec[0]))
-			{
-				log_error(LOG_LEVEL_ERROR, "Bad URL specifier for forward "
-					"directive in configuration file.");
-				string_append(&config->proxy_args,
-					"<br>\nWARNING: Bad URL specifier for "
-					"forward directive in configuration file.");
-				freez(cur_fwd);
-				break;
-			}
-
             /* Save the URL pattern */
-            if (create_pattern_spec(cur_fwd->url, vec[1]))
+            if (create_pattern_spec(cur_fwd->url, vec[0]))
             {
                log_error(LOG_LEVEL_ERROR, "Bad URL specifier for forward "
                      "directive in configuration file.");
@@ -1136,7 +1151,7 @@ struct configuration_spec * load_config(void)
             }
 
             /* Parse the parent HTTP proxy host:port */
-            p = vec[2];
+            p = vec[1];
 
             if (strcmp(p, ".") != 0)
             {
@@ -1152,13 +1167,13 @@ struct configuration_spec * load_config(void)
             break;
 
 /* *************************************************************************
- * forward-socks4 listener-pattern url-pattern socks-proxy[:port] (.|http-proxy[:port])
+ * forward-socks4 url-pattern socks-proxy[:port] (.|http-proxy[:port])
  * *************************************************************************/
          case hash_forward_socks4:
             strlcpy(tmp, arg, sizeof(tmp));
             vec_count = ssplit(tmp, " \t", vec, SZ(vec));
 
-            if (vec_count != 4)
+            if (vec_count != 3)
             {
                log_error(LOG_LEVEL_ERROR, "Wrong number of parameters for "
                      "forward-socks4 directive in configuration file.");
@@ -1172,20 +1187,8 @@ struct configuration_spec * load_config(void)
             cur_fwd = zalloc_or_die(sizeof(*cur_fwd));
             cur_fwd->type = SOCKS_4;
 
-			/* Save the listener pattern */
-			if (create_pattern_spec(cur_fwd->listener, vec[0]))
-			{
-				log_error(LOG_LEVEL_ERROR, "Bad URL specifier for forward-socks4 "
-					"directive in configuration file.");
-				string_append(&config->proxy_args,
-					"<br>\nWARNING: Bad URL specifier for "
-					"forward-socks4 directive in configuration file.");
-				freez(cur_fwd);
-				break;
-			}
-
             /* Save the URL pattern */
-            if (create_pattern_spec(cur_fwd->url, vec[1]))
+            if (create_pattern_spec(cur_fwd->url, vec[0]))
             {
                log_error(LOG_LEVEL_ERROR, "Bad URL specifier for forward-socks4 "
                      "directive in configuration file.");
@@ -1197,7 +1200,7 @@ struct configuration_spec * load_config(void)
             }
 
             /* Parse the SOCKS proxy host[:port] */
-            p = vec[2];
+            p = vec[1];
 
             /* XXX: This check looks like a bug. */
             if (strcmp(p, ".") != 0)
@@ -1208,7 +1211,7 @@ struct configuration_spec * load_config(void)
             }
 
             /* Parse the parent HTTP proxy host[:port] */
-            p = vec[3];
+            p = vec[2];
 
             if (strcmp(p, ".") != 0)
             {
@@ -1224,7 +1227,7 @@ struct configuration_spec * load_config(void)
             break;
 
 /* *************************************************************************
- * forward-socks4a listener-pattern url-pattern socks-proxy[:port] (.|http-proxy[:port])
+ * forward-socks4a url-pattern socks-proxy[:port] (.|http-proxy[:port])
  * *************************************************************************/
          case hash_forward_socks4a:
          case hash_forward_socks5:
@@ -1232,7 +1235,7 @@ struct configuration_spec * load_config(void)
             strlcpy(tmp, arg, sizeof(tmp));
             vec_count = ssplit(tmp, " \t", vec, SZ(vec));
 
-            if (vec_count != 4)
+            if (vec_count != 3)
             {
                log_error(LOG_LEVEL_ERROR,
                   "Wrong number of parameters for %s in configuration file.",
@@ -1262,23 +1265,8 @@ struct configuration_spec * load_config(void)
                cur_fwd->type = SOCKS_5T;
             }
 
-			/* Save the listener pattern */
-			if (create_pattern_spec(cur_fwd->listener, vec[0]))
-			{
-				log_error(LOG_LEVEL_ERROR,
-					"Bad URL specifier for %s in configuration file.",
-					cmd);
-				string_append(&config->proxy_args,
-					"<br>\nWARNING: Bad URL specifier for ");
-				string_append(&config->proxy_args, cmd);
-				string_append(&config->proxy_args,
-					"directive in configuration file.");
-				freez(cur_fwd);
-				break;
-			}
-
             /* Save the URL pattern */
-            if (create_pattern_spec(cur_fwd->url, vec[1]))
+            if (create_pattern_spec(cur_fwd->url, vec[0]))
             {
                log_error(LOG_LEVEL_ERROR,
                   "Bad URL specifier for %s in configuration file.",
@@ -1293,14 +1281,14 @@ struct configuration_spec * load_config(void)
             }
 
             /* Parse the SOCKS proxy host[:port] */
-            p = vec[2];
+            p = vec[1];
 
             cur_fwd->gateway_port = 1080;
             parse_forwarder_address(p, &cur_fwd->gateway_host,
                &cur_fwd->gateway_port);
 
             /* Parse the parent HTTP proxy host[:port] */
-            p = vec[3];
+            p = vec[2];
 
             if (strcmp(p, ".") != 0)
             {
@@ -1359,11 +1347,7 @@ struct configuration_spec * load_config(void)
  * *************************************************************************/
          case hash_hostname :
             freez(config->hostname);
-            config->hostname = strdup(arg);
-            if (NULL == config->hostname)
-            {
-               log_error(LOG_LEVEL_FATAL, "Out of memory saving hostname.");
-            }
+            config->hostname = strdup_or_die(arg);
             break;
 
 /* *************************************************************************
@@ -1402,11 +1386,19 @@ struct configuration_spec * load_config(void)
                   "(You can increase this limit by changing MAX_LISTENING_SOCKETS in project.h and recompiling).",
                   MAX_LISTENING_SOCKETS);
             }
-            config->haddr[i] = strdup(arg);
-            if (NULL == config->haddr[i])
-            {
-               log_error(LOG_LEVEL_FATAL, "Out of memory while copying listening address");
-            }
+            config->haddr[i] = strdup_or_die(arg);
+            break;
+
+/* *************************************************************************
+ * listen-backlog n
+ * *************************************************************************/
+         case hash_listen_backlog :
+            /*
+             * We don't enfore an upper or lower limit because on
+             * many platforms all values are valid and negative
+             * number mean "use the highest value allowed".
+             */
+            config->listen_backlog = parse_numeric_value(cmd, arg);
             break;
 
 /* *************************************************************************
@@ -1439,7 +1431,7 @@ struct configuration_spec * load_config(void)
          {
             int max_client_connections = parse_numeric_value(cmd, arg);
 
-#ifndef _WIN32
+#if !defined(_WIN32) && !defined(HAVE_POLL)
             /*
              * Reject values below 1 for obvious reasons and values above
              * FD_SETSIZE/2 because Privoxy needs two sockets to serve
@@ -1464,7 +1456,10 @@ struct configuration_spec * load_config(void)
              * passed to select().
              * https://msdn.microsoft.com/en-us/library/windows/desktop/ms739169%28v=vs.85%29.aspx
              *
-             * XXX: Do OS/2, Amiga etc. belong here as well?
+             * On platforms were we use poll() we don't have to enforce
+             * an upper connection limit either.
+             *
+             * XXX: Do OS/2 etc. belong here as well?
              */
             if (max_client_connections < 1)
             {
@@ -1558,7 +1553,22 @@ struct configuration_spec * load_config(void)
  * *************************************************************************/
          case hash_proxy_info_url :
             freez(config->proxy_info_url);
-            config->proxy_info_url = strdup(arg);
+            config->proxy_info_url = strdup_or_die(arg);
+            break;
+
+
+/* *************************************************************************
+ * receive-buffer-size n
+ * *************************************************************************/
+         case hash_receive_buffer_size :
+            config->receive_buffer_size = (size_t)parse_numeric_value(cmd, arg);
+            if (config->receive_buffer_size < BUFFER_SIZE)
+            {
+               log_error(LOG_LEVEL_INFO,
+                  "receive-buffer-size %d seems low and may cause problems."
+                  "Consider setting it to at least %d.",
+                  config->receive_buffer_size, BUFFER_SIZE);
+            }
             break;
 
 /* *************************************************************************
@@ -1657,6 +1667,18 @@ struct configuration_spec * load_config(void)
             break;
 
 /* *************************************************************************
+ * trusted-cgi-referrer http://www.example.org/some/path.html
+ * *************************************************************************/
+         case hash_trusted_cgi_referrer :
+            /*
+             * We don't validate the specified referrer as
+             * it's only used for string comparison.
+             */
+            freez(config->trusted_cgi_referrer);
+            config->trusted_cgi_referrer = strdup_or_die(arg);
+            break;
+
+/* *************************************************************************
  * trustfile filename
  * (In confdir by default.)
  * *************************************************************************/
@@ -1677,7 +1699,7 @@ struct configuration_spec * load_config(void)
              * for the directives that were already parsed. Lame.
              */
             freez(config->usermanual);
-            config->usermanual = strdup(arg);
+            config->usermanual = strdup_or_die(arg);
             break;
 
 /* *************************************************************************
@@ -1868,11 +1890,7 @@ struct configuration_spec * load_config(void)
 #ifdef FEATURE_CONNECTION_SHARING
    if (config->feature_flags & RUNTIME_FEATURE_CONNECTION_KEEP_ALIVE)
    {
-      if (config->multi_threaded)
-      {
-         set_keep_alive_timeout(config->keep_alive_timeout);
-      }
-      else
+      if (!config->multi_threaded)
       {
          /*
           * While we could use keep-alive without multiple threads
@@ -1919,11 +1937,7 @@ struct configuration_spec * load_config(void)
 
    if (NULL == config->haddr[0])
    {
-      config->haddr[0] = strdup(HADDR_DEFAULT);
-      if (NULL == config->haddr[0])
-      {
-         log_error(LOG_LEVEL_FATAL, "Out of memory while copying default listening address");
-      }
+      config->haddr[0] = strdup_or_die(HADDR_DEFAULT);
    }
 
    for (i = 0; i < MAX_LISTENING_SOCKETS && NULL != config->haddr[i]; i++)
@@ -1992,17 +2006,16 @@ struct configuration_spec * load_config(void)
 /* FIXME: end kludge */
 
 
-   config->need_bind = 1;
-
-   if (current_configfile)
+   if (current_configfile == NULL)
+   {
+      config->need_bind = 1;
+   }
+   else
    {
       struct configuration_spec * oldcfg = (struct configuration_spec *)
                                            current_configfile->f;
       /*
        * Check if config->haddr[i],hport[i] == oldcfg->haddr[i],hport[i]
-       *
-       * The following could be written more compactly as a single,
-       * (unreadably long) if statement.
        */
       config->need_bind = 0;
 
@@ -2048,7 +2061,7 @@ struct configuration_spec * load_config(void)
  * Description :  Called from `load_config'.  It saves each non-empty
  *                and non-comment line from config into
  *                config->proxy_args.  This is used to create the
- *                show-proxy-args page.  On error, frees
+ *                show-status page.  On error, frees
  *                config->proxy_args and sets it to NULL
  *
  * Parameters  :
@@ -2071,7 +2084,7 @@ static void savearg(char *command, char *argument, struct configuration_spec * c
     * Add config option name embedded in
     * link to its section in the user-manual
     */
-   buf = strdup("\n<a href=\"");
+   buf = strdup_or_die("\n<a href=\"");
    if (!strncmpic(config->usermanual, "file://", 7) ||
        !strncmpic(config->usermanual, "http", 4))
    {

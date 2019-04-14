@@ -22,7 +22,7 @@
     <ProjectGuid>{799D237D-7248-49D5-925F-3FA633BBD867}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
     <RootNamespace>LibPrivoxy</RootNamespace>
-    <WindowsTargetPlatformVersion>10.0.16299.0</WindowsTargetPlatformVersion>
+    <WindowsTargetPlatformVersion>10.0.17763.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -211,7 +211,6 @@
     <None Include="..\src\templates\show-status" />
     <None Include="..\src\templates\show-status-file" />
     <None Include="..\src\templates\show-url-info" />
-    <None Include="..\src\templates\show-version" />
     <None Include="..\src\templates\toggle" />
     <None Include="..\src\templates\toggle-mini" />
     <None Include="..\src\templates\untrusted" />
@@ -223,7 +222,6 @@
     <ClInclude Include="..\src\acconfig.h" />
     <ClInclude Include="..\src\actionlist.h" />
     <ClInclude Include="..\src\actions.h" />
-    <ClInclude Include="..\src\amiga.h" />
     <ClInclude Include="..\src\cgi.h" />
     <ClInclude Include="..\src\cgiedit.h" />
     <ClInclude Include="..\src\cgisimple.h" />
@@ -264,7 +262,6 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\src\actions.c" />
-    <ClCompile Include="..\src\amiga.c" />
     <ClCompile Include="..\src\cgi.c" />
     <ClCompile Include="..\src\cgiedit.c" />
     <ClCompile Include="..\src\cgisimple.c" />
@@ -273,6 +270,7 @@
     <ClCompile Include="..\src\encode.c" />
     <ClCompile Include="..\src\errlog.c" />
     <ClCompile Include="..\src\filters.c" />
+    <ClCompile Include="..\src\fuzz.c" />
     <ClCompile Include="..\src\gateway.c" />
     <ClCompile Include="..\src\libprivoxyext.c" />
     <ClCompile Include="..\src\jbsockets.c" />

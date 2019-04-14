@@ -1,7 +1,7 @@
 <!DOCTYPE article PUBLIC "-//OASIS//DTD DocBook V3.1//EN"[
 <!entity % dummy "IGNORE">
 <!entity config SYSTEM "p-config.sgml">
-<!entity p-version "3.0.26">
+<!entity p-version "3.0.28">
 <!entity p-status "stable">
 <!entity % p-not-stable "IGNORE">
 <!entity % user-man "IGNORE">
@@ -9,13 +9,11 @@
 <!entity  my-app "<application>Privoxy</application>">
 ]>
 <!--
- File        :  $Source: /cvsroot/ijbswa/current/doc/source/config.sgml,v $
+ File        :  doc/source/config.sgml
 
  Purpose     :  config file generation
 
- $Id: config.sgml,v 2.34 2016/08/26 12:27:34 fabiankeil Exp $
-
- Copyright (C) 2001-2009 Privoxy Developers https://www.privoxy.org/
+ Copyright (C) 2001-2018 Privoxy Developers https://www.privoxy.org/
  See LICENSE.
 
  ========================================================================

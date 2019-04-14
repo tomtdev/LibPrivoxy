@@ -1,4 +1,3 @@
-const char deanimate_rcs[] = "$Id: deanimate.c,v 1.24 2016/02/26 12:29:38 fabiankeil Exp $";
 /*********************************************************************
  *
  * File        :  $Source: /cvsroot/ijbswa/current/deanimate.c,v $
@@ -41,12 +40,10 @@ const char deanimate_rcs[] = "$Id: deanimate.c,v 1.24 2016/02/26 12:29:38 fabian
 #include <string.h>
 #include <fcntl.h>
 
-#include "errlog.h"
 #include "project.h"
+#include "errlog.h"
 #include "deanimate.h"
 #include "miscutil.h"
-
-const char deanimate_h_rcs[] = DEANIMATE_H_VERSION;
 
 /*********************************************************************
  *

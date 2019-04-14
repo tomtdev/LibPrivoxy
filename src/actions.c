@@ -1,4 +1,3 @@
-const char actions_rcs[] = "$Id: actions.c,v 1.97 2016/05/03 13:20:37 fabiankeil Exp $";
 /*********************************************************************
  *
  * File        :  $Source: /cvsroot/ijbswa/current/actions.c,v $
@@ -33,6 +32,8 @@ const char actions_rcs[] = "$Id: actions.c,v 1.97 2016/05/03 13:20:37 fabiankeil
  *********************************************************************/
 
 
+#include "config.h"
+
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>
@@ -41,8 +42,6 @@ const char actions_rcs[] = "$Id: actions.c,v 1.97 2016/05/03 13:20:37 fabiankeil
 #ifdef FEATURE_PTHREAD
 #include <pthread.h>
 #endif
-
-#include "config.h"
 
 #include "project.h"
 #include "jcc.h"
@@ -56,9 +55,6 @@ const char actions_rcs[] = "$Id: actions.c,v 1.97 2016/05/03 13:20:37 fabiankeil
 #include "cgi.h"
 #include "ssplit.h"
 #include "filters.h"
-
-const char actions_h_rcs[] = ACTIONS_H_VERSION;
-
 
 /*
  * We need the main list of options.
@@ -124,7 +120,10 @@ static const struct action_name action_names[] =
 };
 
 
-static int load_one_actions_file(struct client_state *csp, int fileid);
+#ifndef FUZZ
+static
+#endif
+int load_one_actions_file(struct client_state *csp, int fileid);
 
 
 /*********************************************************************
@@ -1210,7 +1209,10 @@ static int action_spec_is_valid(struct client_state *csp, const struct action_sp
  * Returns     :  0 => Ok, everything else is an error.
  *
  *********************************************************************/
-static int load_one_actions_file(struct client_state *csp, int fileid)
+#ifndef FUZZ
+static
+#endif
+int load_one_actions_file(struct client_state *csp, int fileid)
 {
 
    /*

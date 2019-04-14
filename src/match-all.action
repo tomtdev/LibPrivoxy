@@ -1,5 +1,4 @@
 #############################################################################
-# $Id: match-all.action,v 1.4 2016/03/27 16:54:05 fabiankeil Exp $
 #
 # This file contains the actions that are applied to all requests and
 # may be overruled later on by other actions files. Less experienced

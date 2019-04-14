@@ -1,7 +1,5 @@
 #ifndef PROJECT_H_INCLUDED
 #define PROJECT_H_INCLUDED
-/** Version string. */
-#define PROJECT_H_VERSION "$Id: project.h,v 1.216 2016/05/25 10:50:55 fabiankeil Exp $"
 /*********************************************************************
  *
  * File        :  $Source: /cvsroot/ijbswa/current/project.h,v $
@@ -53,7 +51,6 @@
 #    include <sys/socket.h>
 #  else
 #    include <stdint.h>
-#    include <winsock2.h>
 #    include <ws2tcpip.h>
      typedef unsigned short in_port_t;
 #  endif
@@ -91,10 +88,6 @@
 #    include <pcreposix.h>
 #  endif
 #endif
-
-#ifdef AMIGA
-#include "amiga.h"
-#endif /* def AMIGA */
 
 #ifdef _WIN32
 /*
@@ -502,7 +495,7 @@ struct iob
 #define ACTION_CRUNCH_CLIENT_HEADER                  0x00200000UL
 /** Action bitmap: Enable text mode by force */
 #define ACTION_FORCE_TEXT_MODE                       0x00400000UL
-/** Action bitmap: Enable text mode by force */
+/** Action bitmap: Remove the "If-None-Match" header. */
 #define ACTION_CRUNCH_IF_NONE_MATCH                  0x00800000UL
 /** Action bitmap: Enable content-disposition crunching */
 #define ACTION_HIDE_CONTENT_DISPOSITION              0x01000000UL
@@ -512,6 +505,8 @@ struct iob
 #define ACTION_HIDE_ACCEPT_LANGUAGE                  0x04000000UL
 /** Action bitmap: Limit the cookie lifetime */
 #define ACTION_LIMIT_COOKIE_LIFETIME                 0x08000000UL
+/** Action bitmap: Delay writes */
+#define ACTION_DELAY_RESPONSE                        0x10000000UL
 
 
 /** Action string index: How to deanimate GIFs */
@@ -552,8 +547,10 @@ struct iob
 #define ACTION_STRING_CHANGE_X_FORWARDED_FOR 17
 /** Action string index: how many minutes cookies should be valid. */
 #define ACTION_STRING_LIMIT_COOKIE_LIFETIME 18
+/** Action string index: how many milliseconds writes should be delayed. */
+#define ACTION_STRING_DELAY_RESPONSE       19
 /** Number of string actions. */
-#define ACTION_STRING_COUNT                19
+#define ACTION_STRING_COUNT                20
 
 
 /* To make the ugly hack in sed easier to understand */
@@ -866,6 +863,12 @@ struct reusable_connection
  */
 #define CSP_FLAG_CRUNCHED                           0x04000000U
 
+#ifdef FUZZ
+/**
+ * Flag for csp->flags: Set if we are working with fuzzed input
+ */
+#define CSP_FLAG_FUZZED_INPUT                       0x08000000U
+#endif
 
 /*
  * Flags for use in return codes of child processes
@@ -951,6 +954,12 @@ struct client_state
 
    /** An I/O buffer used for buffering data read from the client */
    struct iob client_iob[1];
+
+   /** Buffer used to briefly store data read from the network
+    *  before forwarding or processing it.
+    */
+   char *receive_buffer;
+   size_t receive_buffer_size;
 
    /** List of all headers for this request */
    struct list headers[1];
@@ -1119,9 +1128,6 @@ struct block_spec
  */
 struct forward_spec
 {
-	/** Listener pattern that this forward_spec is for. */
-	struct pattern_spec listener[1];
-
    /** URL pattern that this forward_spec is for. */
    struct pattern_spec url[1];
 
@@ -1278,9 +1284,6 @@ struct client_tag_spec
 
 #define MAX_DNS_SERVERS 6
 
-#define MAX_FORWARD_URLS 6
-
-#define FORWARD_CONNECT_TIMEOUT 3
 /**
  * Data loaded from the configuration file.
  *
@@ -1344,11 +1347,25 @@ struct configuration_spec
    /** IP addresses to bind to.  Defaults to HADDR_DEFAULT == 127.0.0.1. */
    const char *haddr[MAX_LISTENING_SOCKETS];
 
+   /** Trusted referring site that can be used to reach CGI
+     * pages that aren't marked as harmful.
+     */
+   const char *trusted_cgi_referrer;
+
    /** Ports to bind to.  Defaults to HADDR_PORT == 8118. */
    int         hport[MAX_LISTENING_SOCKETS];
 
    /** Size limit for IOB */
    size_t buffer_limit;
+
+   /** Size of the receive buffer */
+   size_t receive_buffer_size;
+
+   /** Use accf_http(4) if available */
+   int enable_accept_filter;
+
+   /** Backlog passed to listen() */
+   int listen_backlog;
    
    /** Use specified DNS servers. */
    const char *dns_servers[MAX_DNS_SERVERS];

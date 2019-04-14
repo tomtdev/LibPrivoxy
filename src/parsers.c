@@ -1,11 +1,10 @@
-const char parsers_rcs[] = "$Id: parsers.c,v 1.309 2016/04/30 10:28:36 fabiankeil Exp $";
 /*********************************************************************
  *
  * File        :  $Source: /cvsroot/ijbswa/current/parsers.c,v $
  *
  * Purpose     :  Declares functions to parse/crunch headers and pages.
  *
- * Copyright   :  Written by and Copyright (C) 2001-2016 the
+ * Copyright   :  Written by and Copyright (C) 2001-2017 the
  *                Privoxy team. http://www.privoxy.org/
  *
  *                Based on the Internet Junkbuster originally written
@@ -33,6 +32,7 @@ const char parsers_rcs[] = "$Id: parsers.c,v 1.309 2016/04/30 10:28:36 fabiankei
  *********************************************************************/
 
 
+#include "config.h"
 
 #ifndef _WIN32
 #include <stdio.h>
@@ -69,8 +69,6 @@ const char parsers_rcs[] = "$Id: parsers.c,v 1.309 2016/04/30 10:28:36 fabiankei
 #include <unistd.h>
 #endif
 
-#include "config.h"
-
 #include "project.h"
 
 #ifdef FEATURE_PTHREAD
@@ -90,8 +88,6 @@ const char parsers_rcs[] = "$Id: parsers.c,v 1.309 2016/04/30 10:28:36 fabiankei
 #ifndef HAVE_STRPTIME
 #include "strptime.h"
 #endif
-
-const char parsers_h_rcs[] = PARSERS_H_VERSION;
 
 static char *get_header_line(struct iob *iob);
 static jb_err scan_headers(struct client_state *csp);
@@ -253,13 +249,14 @@ static const add_header_func_ptr add_server_headers[] = {
 
 /*********************************************************************
  *
- * Function    :  flush_socket
+ * Function    :  flush_iob
  *
  * Description :  Write any pending "buffered" content.
  *
  * Parameters  :
  *          1  :  fd = file descriptor of the socket to read
  *          2  :  iob = The I/O buffer to flush, usually csp->iob.
+ *          3  :  delay = Number of milliseconds to delay the writes
  *
  * Returns     :  On success, the number of bytes written are returned (zero
  *                indicates nothing was written).  On error, -1 is returned,
@@ -269,7 +266,7 @@ static const add_header_func_ptr add_server_headers[] = {
  *                file, the results are not portable.
  *
  *********************************************************************/
-long flush_socket(jb_socket fd, struct iob *iob)
+long flush_iob(jb_socket fd, struct iob *iob, unsigned int delay)
 {
    long len = iob->eod - iob->cur;
 
@@ -278,7 +275,7 @@ long flush_socket(jb_socket fd, struct iob *iob)
       return(0);
    }
 
-   if (write_socket(fd, iob->cur, (size_t)len))
+   if (write_socket_delayed(fd, iob->cur, (size_t)len, delay))
    {
       return(-1);
    }
@@ -422,8 +419,13 @@ jb_err decompress_iob(struct client_state *csp)
    int status;       /* return status of the inflate() call */
    z_stream zstr;    /* used by calls to zlib */
 
+#ifdef FUZZ
+   assert(csp->iob->cur - csp->iob->buf >= 0);
+   assert(csp->iob->eod - csp->iob->cur >= 0);
+#else
    assert(csp->iob->cur - csp->iob->buf > 0);
    assert(csp->iob->eod - csp->iob->cur > 0);
+#endif
 
    bufsize = csp->iob->size;
    skip_size = (size_t)(csp->iob->cur - csp->iob->buf);
@@ -719,7 +721,7 @@ jb_err decompress_iob(struct client_state *csp)
     * Make sure the new uncompressed iob obeys some minimal
     * consistency conditions.
     */
-   if ((csp->iob->buf <  csp->iob->cur)
+   if ((csp->iob->buf <=  csp->iob->cur)
     && (csp->iob->cur <= csp->iob->eod)
     && (csp->iob->eod <= csp->iob->buf + csp->iob->size))
    {
@@ -1698,6 +1700,36 @@ static jb_err server_proxy_connection(struct client_state *csp, char **header)
 
 /*********************************************************************
  *
+ * Function    :  proxy_authentication
+ *
+ * Description :  Removes headers that are relevant for proxy
+ *                authentication unless forwarding them has
+ *                been explicitly requested.
+ *
+ * Parameters  :
+ *          1  :  csp = Current client state (buffers, headers, etc...)
+ *          2  :  header = On input, pointer to header to modify.
+ *                On output, pointer to the modified header, or NULL
+ *                to remove the header.  This function frees the
+ *                original string if necessary.
+ *
+ * Returns     :  JB_ERR_OK.
+ *
+ *********************************************************************/
+static jb_err proxy_authentication(struct client_state *csp, char **header)
+{
+   if ((csp->config->feature_flags &
+      RUNTIME_FEATURE_FORWARD_PROXY_AUTHENTICATION_HEADERS) == 0) {
+      log_error(LOG_LEVEL_HEADER,
+         "Forwarding proxy authentication headers is disabled. Crunching: %s", *header);
+      freez(*header);
+   }
+   return JB_ERR_OK;
+}
+
+
+/*********************************************************************
+ *
  * Function    :  client_keep_alive
  *
  * Description :  Stores the client's keep alive timeout.
@@ -1782,7 +1814,9 @@ static jb_err client_keep_alive(struct client_state *csp, char **header)
 static jb_err get_content_length(const char *header_value, unsigned long long *length)
 {
 #ifdef _WIN32
-   assert(sizeof(unsigned long long) > 4);
+#if SIZEOF_LONG_LONG < 8
+/*#error sizeof(unsigned long long) too small*/
+#endif
    if (1 != sscanf(header_value, "%I64u", length))
 #else
    if (1 != sscanf(header_value, "%llu", length))
@@ -1834,36 +1868,6 @@ static jb_err client_save_content_length(struct client_state *csp, char **header
 }
 #endif /* def FEATURE_CONNECTION_KEEP_ALIVE */
 
-
-
-/*********************************************************************
- *
- * Function    :  proxy_authentication
- *
- * Description :  Removes headers that are relevant for proxy
- *                authentication unless forwarding them has
- *                been explicitly requested.
- *
- * Parameters  :
- *          1  :  csp = Current client state (buffers, headers, etc...)
- *          2  :  header = On input, pointer to header to modify.
- *                On output, pointer to the modified header, or NULL
- *                to remove the header.  This function frees the
- *                original string if necessary.
- *
- * Returns     :  JB_ERR_OK.
- *
- *********************************************************************/
-static jb_err proxy_authentication(struct client_state *csp, char **header)
-{
-   if ((csp->config->feature_flags &
-      RUNTIME_FEATURE_FORWARD_PROXY_AUTHENTICATION_HEADERS) == 0) {
-      log_error(LOG_LEVEL_HEADER,
-         "Forwarding proxy authentication headers is disabled. Crunching: %s", *header);
-      freez(*header);
-   }
-   return JB_ERR_OK;
-}
 
 
 /*********************************************************************
@@ -3801,7 +3805,8 @@ static jb_err server_proxy_connection_adder(struct client_state *csp)
  * Function    :  client_connection_header_adder
  *
  * Description :  Adds a proper "Connection:" header to csp->headers
- *                unless the header was already present. Called from `sed'.
+ *                unless the header was already present or it's a
+ *                CONNECT request. Called from `sed'.
  *
  * Parameters  :
  *          1  :  csp = Current client state (buffers, headers, etc...)
@@ -3820,10 +3825,20 @@ static jb_err client_connection_header_adder(struct client_state *csp)
       return JB_ERR_OK;
    }
 
+   /*
+    * In case of CONNECT requests "Connection: close" is implied,
+    * but actually setting the header has been reported to cause
+    * problems with some forwarding proxies that close the
+    * connection prematurely.
+    */
+   if (csp->http->ssl != 0)
+   {
+      return JB_ERR_OK;
+   }
+
 #ifdef FEATURE_CONNECTION_KEEP_ALIVE
    if ((csp->config->feature_flags & RUNTIME_FEATURE_CONNECTION_KEEP_ALIVE)
       && !(csp->flags & CSP_FLAG_SERVER_SOCKET_TAINTED)
-      && (csp->http->ssl == 0)
       && !strcmpic(csp->http->ver, "HTTP/1.1"))
    {
       csp->flags |= CSP_FLAG_CLIENT_CONNECTION_KEEP_ALIVE;
@@ -4629,7 +4644,14 @@ static jb_err handle_conditional_hide_referrer_parameter(char **header,
 static void create_content_length_header(unsigned long long content_length,
                                          char *header, size_t buffer_length)
 {
+#ifdef _WIN32
+#if SIZEOF_LONG_LONG < 8
+/*#error sizeof(unsigned long long) too small*/
+#endif
+   snprintf(header, buffer_length, "Content-Length: %I64u", content_length);
+#else
    snprintf(header, buffer_length, "Content-Length: %llu", content_length);
+#endif
 }
 
 

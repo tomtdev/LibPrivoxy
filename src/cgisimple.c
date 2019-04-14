@@ -1,4 +1,3 @@
-const char cgisimple_rcs[] = "$Id: cgisimple.c,v 1.142 2016/05/22 12:43:07 fabiankeil Exp $";
 /*********************************************************************
  *
  * File        :  $Source: /cvsroot/ijbswa/current/cgisimple.c,v $
@@ -6,7 +5,7 @@ const char cgisimple_rcs[] = "$Id: cgisimple.c,v 1.142 2016/05/22 12:43:07 fabia
  * Purpose     :  Simple CGIs to get information about Privoxy's
  *                status.
  *
- * Copyright   :  Written by and Copyright (C) 2001-2016 the
+ * Copyright   :  Written by and Copyright (C) 2001-2017 the
  *                Privoxy team. http://www.privoxy.org/
  *
  *                Based on the Internet Junkbuster originally written
@@ -34,6 +33,8 @@ const char cgisimple_rcs[] = "$Id: cgisimple.c,v 1.142 2016/05/22 12:43:07 fabia
  **********************************************************************/
 
 
+#include "config.h"
+
 #include <stdio.h>
 #include <sys/types.h>
 #include <stdlib.h>
@@ -44,8 +45,6 @@ const char cgisimple_rcs[] = "$Id: cgisimple.c,v 1.142 2016/05/22 12:43:07 fabia
 #if defined (HAVE_ACCESS) && defined (HAVE_UNISTD_H)
 #include <unistd.h>
 #endif /* def HAVE_ACCESS && HAVE_UNISTD_H */
-
-#include "config.h"
 
 #include "project.h"
 #include "cgi.h"
@@ -64,9 +63,6 @@ const char cgisimple_rcs[] = "$Id: cgisimple.c,v 1.142 2016/05/22 12:43:07 fabia
 #include "client-tags.h"
 #endif
 
-const char cgisimple_h_rcs[] = CGISIMPLE_H_VERSION;
-
-static char *show_rcs(void);
 static jb_err show_defines(struct map *exports);
 static jb_err cgi_show_file(struct client_state *csp,
                             struct http_response *rsp,
@@ -310,7 +306,7 @@ static void cgi_create_client_tag_form(char *form, size_t size,
    }
 
    snprintf(form, size,
-      "<form method=\"GET\" action=\"client-tags\" style=\"display: inline\">\n"
+      "<form method=\"GET\" action=\""CGI_PREFIX"toggle-client-tag\" style=\"display: inline\">\n"
       " <input type=\"hidden\" name=\"tag\" value=\"%s\">\n"
       " <input type=\"hidden\" name=\"toggle-state\" value=\"%u\">\n"
       " <input type=\"hidden\" name=\"expires\" value=\"%u\">\n"
@@ -343,12 +339,9 @@ jb_err cgi_show_client_tags(struct client_state *csp,
    struct map *exports;
    struct client_tag_spec *this_tag;
    jb_err err = JB_ERR_OK;
-   const char *toggled_tag;
-   const char *toggle_state;
-   const char *tag_expires;
-   time_t time_to_live;
    char *client_tag_status;
    char buf[1000];
+   time_t refresh_delay;
 
    assert(csp);
    assert(rsp);
@@ -359,28 +352,7 @@ jb_err cgi_show_client_tags(struct client_state *csp,
       return JB_ERR_MEMORY;
    }
    assert(csp->client_address != NULL);
-   toggled_tag = lookup(parameters, "tag");
-   if (*toggled_tag != '\0')
-   {
-      tag_expires = lookup(parameters, "expires");
-      if (*tag_expires == '0')
-      {
-         time_to_live = 0;
-      }
-      else
-      {
-         time_to_live = csp->config->client_tag_lifetime;
-      }
-      toggle_state = lookup(parameters, "toggle-state");
-      if (*toggle_state == '1')
-      {
-         enable_client_specific_tag(csp, toggled_tag, time_to_live);
-      }
-      else
-      {
-         disable_client_specific_tag(csp, toggled_tag);
-      }
-   }
+
    this_tag = csp->config->client_tags;
    if (this_tag->name == NULL)
    {
@@ -415,12 +387,34 @@ jb_err cgi_show_client_tags(struct client_state *csp,
          if (!err) err = string_append(&client_tag_status, "</td></tr>\n");
          if (err)
          {
-            free_map(exports);
-            return JB_ERR_MEMORY;
+            break;
          }
          this_tag = this_tag->next;
       }
       if (!err) err = string_append(&client_tag_status, "</table>\n");
+      if (err)
+      {
+         free_map(exports);
+         return JB_ERR_MEMORY;
+      }
+   }
+   refresh_delay = get_next_tag_timeout_for_client(csp->client_address);
+   if (refresh_delay != 0)
+   {
+      snprintf(buf, sizeof(buf), "%d", csp->config->client_tag_lifetime);
+      if (map(exports, "refresh-delay", 1, buf, 1))
+      {
+         free_map(exports);
+         return JB_ERR_MEMORY;
+      }
+   }
+   else
+   {
+      err = map_block_killer(exports, "tags-expire");
+      if (err != JB_ERR_OK)
+      {
+         return err;
+      }
    }
 
    if (map(exports, "client-tags", 1, client_tag_status, 0))
@@ -436,6 +430,78 @@ jb_err cgi_show_client_tags(struct client_state *csp,
    }
 
    return template_fill_for_cgi(csp, "client-tags", exports, rsp);
+}
+
+
+/*********************************************************************
+ *
+ * Function    :  cgi_toggle_client_tag
+ *
+ * Description :  Toggles a client tag and redirects to the show-tags
+ *                page
+ *
+ * Parameters  :
+ *          1  :  csp = Current client state (buffers, headers, etc...)
+ *          2  :  rsp = http_response data structure for output
+ *          3  :  parameters = map of cgi parameters
+ *
+ * CGI Parameters : none
+ *          1  :  tag = Name of the tag to enable or disable
+ *          2  :  toggle-state = How to toggle the tag (0/1)
+ *          3  :  expires = Set to 1 if the tag should be enabled
+ *                          temporarily, otherwise set to 0
+ *
+ * Returns     :  JB_ERR_OK on success
+ *                JB_ERR_MEMORY on out-of-memory error.
+ *
+ *********************************************************************/
+jb_err cgi_toggle_client_tag(struct client_state *csp,
+                             struct http_response *rsp,
+                             const struct map *parameters)
+{
+   const char *toggled_tag;
+   const char *toggle_state;
+   const char *tag_expires;
+   time_t time_to_live;
+
+   assert(csp);
+   assert(rsp);
+   assert(parameters);
+
+   toggled_tag = lookup(parameters, "tag");
+   if (*toggled_tag == '\0')
+   {
+      log_error(LOG_LEVEL_ERROR, "Received tag toggle request without tag");
+   }
+   else
+   {
+      tag_expires = lookup(parameters, "expires");
+      if (*tag_expires == '0')
+      {
+         time_to_live = 0;
+      }
+      else
+      {
+         time_to_live = csp->config->client_tag_lifetime;
+      }
+      toggle_state = lookup(parameters, "toggle-state");
+      if (*toggle_state == '1')
+      {
+         enable_client_specific_tag(csp, toggled_tag, time_to_live);
+      }
+      else
+      {
+         disable_client_specific_tag(csp, toggled_tag);
+      }
+   }
+   rsp->status = strdup_or_die("302 Done dealing with toggle request");
+   if (enlist_unique_header(rsp->headers,
+         "Location", CGI_PREFIX "client-tags"))
+   {
+         return JB_ERR_MEMORY;
+   }
+   return JB_ERR_OK;
+
 }
 #endif /* def FEATURE_CLIENT_TAGS */
 
@@ -971,49 +1037,6 @@ jb_err cgi_send_user_manual(struct client_state *csp,
 
 /*********************************************************************
  *
- * Function    :  cgi_show_version
- *
- * Description :  CGI function that returns a a web page describing the
- *                file versions of Privoxy.
- *
- * Parameters  :
- *          1  :  csp = Current client state (buffers, headers, etc...)
- *          2  :  rsp = http_response data structure for output
- *          3  :  parameters = map of cgi parameters
- *
- * CGI Parameters : none
- *
- * Returns     :  JB_ERR_OK on success
- *                JB_ERR_MEMORY on out-of-memory error.
- *
- *********************************************************************/
-jb_err cgi_show_version(struct client_state *csp,
-                        struct http_response *rsp,
-                        const struct map *parameters)
-{
-   struct map *exports;
-
-   assert(csp);
-   assert(rsp);
-   assert(parameters);
-
-   if (NULL == (exports = default_exports(csp, "show-version")))
-   {
-      return JB_ERR_MEMORY;
-   }
-
-   if (map(exports, "sourceversions", 1, show_rcs(), 0))
-   {
-      free_map(exports);
-      return JB_ERR_MEMORY;
-   }
-
-   return template_fill_for_cgi(csp, "show-version", exports, rsp);
-}
-
-
-/*********************************************************************
- *
  * Function    :  cgi_show_status
  *
  * Description :  CGI function that returns a web page describing the
@@ -1535,9 +1558,7 @@ jb_err cgi_show_url_info(struct client_state *csp,
        * display the proxy port and an eventual second forwarder.
        */
       {
-		 struct forward_spec const *fwds[MAX_FORWARD_URLS];
-		 int fwd_count = forward_url(csp, url_to_query, fwds);
-         const struct forward_spec *fwd = fwds[0];
+         const struct forward_spec *fwd = forward_url(csp, url_to_query);
 
          if ((fwd->gateway_host == NULL) && (fwd->forward_host == NULL))
          {
@@ -1782,6 +1803,14 @@ static jb_err show_defines(struct map *exports)
 #endif
       },
       {
+         "FEATURE_EXTERNAL_FILTERS",
+#ifdef FEATURE_EXTERNAL_FILTERS
+         1,
+#else
+         0,
+#endif
+      },
+      {
          "FEATURE_FAST_REDIRECTS",
 #ifdef FEATURE_FAST_REDIRECTS
          1,
@@ -1808,14 +1837,6 @@ static jb_err show_defines(struct map *exports)
       {
          "FEATURE_IMAGE_BLOCKING",
 #ifdef FEATURE_IMAGE_BLOCKING
-         1,
-#else
-         0,
-#endif
-      },
-      {
-         "FEATURE_IMAGE_DETECT_MSIE",
-#ifdef FEATURE_IMAGE_DETECT_MSIE
          1,
 #else
          0,
@@ -1905,102 +1926,6 @@ static jb_err show_defines(struct map *exports)
    }
 
    return err;
-
-}
-
-
-/*********************************************************************
- *
- * Function    :  show_rcs
- *
- * Description :  Create a string with the rcs info for all sourcefiles
- *
- * Parameters  :  None
- *
- * Returns     :  A string, or NULL on out-of-memory.
- *
- *********************************************************************/
-static char *show_rcs(void)
-{
-   char *result = strdup_or_die("");
-   char buf[BUFFER_SIZE];
-
-   /* Instead of including *all* dot h's in the project (thus creating a
-    * tremendous amount of dependencies), I will concede to declaring them
-    * as extern's.  This forces the developer to add to this list, but oh well.
-    */
-
-#define SHOW_RCS(__x)              \
-   {                               \
-      extern const char __x[];     \
-      snprintf(buf, sizeof(buf), " %s\n", __x);   \
-      string_append(&result, buf); \
-   }
-
-   /* In alphabetical order */
-   SHOW_RCS(actions_h_rcs)
-   SHOW_RCS(actions_rcs)
-#ifdef AMIGA
-   SHOW_RCS(amiga_h_rcs)
-   SHOW_RCS(amiga_rcs)
-#endif /* def AMIGA */
-   SHOW_RCS(cgi_h_rcs)
-   SHOW_RCS(cgi_rcs)
-#ifdef FEATURE_CGI_EDIT_ACTIONS
-   SHOW_RCS(cgiedit_h_rcs)
-   SHOW_RCS(cgiedit_rcs)
-#endif /* def FEATURE_CGI_EDIT_ACTIONS */
-   SHOW_RCS(cgisimple_h_rcs)
-   SHOW_RCS(cgisimple_rcs)
-#ifdef __MINGW32__
-   SHOW_RCS(cygwin_h_rcs)
-#endif
-   SHOW_RCS(deanimate_h_rcs)
-   SHOW_RCS(deanimate_rcs)
-   SHOW_RCS(encode_h_rcs)
-   SHOW_RCS(encode_rcs)
-   SHOW_RCS(errlog_h_rcs)
-   SHOW_RCS(errlog_rcs)
-   SHOW_RCS(filters_h_rcs)
-   SHOW_RCS(filters_rcs)
-   SHOW_RCS(gateway_h_rcs)
-   SHOW_RCS(gateway_rcs)
-   SHOW_RCS(jbsockets_h_rcs)
-   SHOW_RCS(jbsockets_rcs)
-   SHOW_RCS(jcc_h_rcs)
-   SHOW_RCS(jcc_rcs)
-   SHOW_RCS(list_h_rcs)
-   SHOW_RCS(list_rcs)
-   SHOW_RCS(loadcfg_h_rcs)
-   SHOW_RCS(loadcfg_rcs)
-   SHOW_RCS(loaders_h_rcs)
-   SHOW_RCS(loaders_rcs)
-   SHOW_RCS(miscutil_h_rcs)
-   SHOW_RCS(miscutil_rcs)
-   SHOW_RCS(parsers_h_rcs)
-   SHOW_RCS(parsers_rcs)
-   SHOW_RCS(pcrs_rcs)
-   SHOW_RCS(pcrs_h_rcs)
-   SHOW_RCS(project_h_rcs)
-   SHOW_RCS(ssplit_h_rcs)
-   SHOW_RCS(ssplit_rcs)
-   SHOW_RCS(urlmatch_h_rcs)
-   SHOW_RCS(urlmatch_rcs)
-#ifdef _WIN32
-#ifndef _WIN_CONSOLE
-   SHOW_RCS(w32log_h_rcs)
-   SHOW_RCS(w32log_rcs)
-   SHOW_RCS(w32res_h_rcs)
-   SHOW_RCS(w32taskbar_h_rcs)
-   SHOW_RCS(w32taskbar_rcs)
-#endif /* ndef _WIN_CONSOLE */
-   SHOW_RCS(win32_h_rcs)
-   SHOW_RCS(win32_rcs)
-#endif /* def _WIN32 */
-
-#undef SHOW_RCS
-
-   return result;
 
 }
 

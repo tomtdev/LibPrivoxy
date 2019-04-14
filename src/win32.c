@@ -1,4 +1,3 @@
-const char win32_rcs[] = "$Id: win32.c,v 1.20 2015/08/12 10:39:16 fabiankeil Exp $";
 /*********************************************************************
  *
  * File        :  $Source: /cvsroot/ijbswa/current/win32.c,v $
@@ -59,8 +58,6 @@ const char win32_rcs[] = "$Id: win32.c,v 1.20 2015/08/12 10:39:16 fabiankeil Exp
 #endif /* defined(_WIN32) && defined(_MSC_VER) && defined(_DEBUG) */
 
 #include "win32.h"
-
-const char win32_h_rcs[] = WIN32_H_VERSION;
 
 /**
  * A short introductory text about Privoxy.  Used for the "About" box
@@ -244,7 +241,7 @@ void InitWin32(void)
 #endif
    }
 #endif
-   wVersionRequested = MAKEWORD(2, 2);
+   wVersionRequested = MAKEWORD(2, 0);
    if (WSAStartup(wVersionRequested, &wsaData) != 0)
    {
 #ifndef _WIN_CONSOLE

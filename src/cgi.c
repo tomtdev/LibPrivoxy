@@ -1,4 +1,3 @@
-const char cgi_rcs[] = "$Id: cgi.c,v 1.165 2016/05/03 13:22:30 fabiankeil Exp $";
 /*********************************************************************
  *
  * File        :  $Source: /cvsroot/ijbswa/current/cgi.c,v $
@@ -8,8 +7,8 @@ const char cgi_rcs[] = "$Id: cgi.c,v 1.165 2016/05/03 13:22:30 fabiankeil Exp $"
  *                This only contains the framework functions, the
  *                actual handler functions are declared elsewhere.
  *
- * Copyright   :  Written by and Copyright (C) 2001-2004, 2006-2008
- *                the SourceForge Privoxy team. http://www.privoxy.org/
+ * Copyright   :  Written by and Copyright (C) 2001-2017
+ *                members of the Privoxy team. http://www.privoxy.org/
  *
  *                Based on the Internet Junkbuster originally written
  *                by and Copyright (C) 1997 Anonymous Coders and
@@ -36,9 +35,7 @@ const char cgi_rcs[] = "$Id: cgi.c,v 1.165 2016/05/03 13:22:30 fabiankeil Exp $"
  **********************************************************************/
 
 
-#if defined( _WIN32 ) && defined( RES_IN_DLL )
-#include <windows.h>
-#endif
+#include "config.h"
 
 #include <stdio.h>
 #include <sys/types.h>
@@ -47,13 +44,10 @@ const char cgi_rcs[] = "$Id: cgi.c,v 1.165 2016/05/03 13:22:30 fabiankeil Exp $"
 #include <string.h>
 #include <limits.h>
 #include <assert.h>
-#include <sys/stat.h>
 
 #ifdef FEATURE_COMPRESSION
 #include <zlib.h>
 #endif
-
-#include "config.h"
 
 #include "project.h"
 #include "cgi.h"
@@ -73,9 +67,6 @@ const char cgi_rcs[] = "$Id: cgi.c,v 1.165 2016/05/03 13:22:30 fabiankeil Exp $"
 #include "loadcfg.h"
 /* jcc.h is for mutex semaphore globals only */
 #include "jcc.h"
-
-const char cgi_h_rcs[] = CGI_H_VERSION;
-
 #ifdef RES_IN_DLL
 extern HMODULE g_hLibPrivoxyModule;
 #endif
@@ -104,15 +95,16 @@ static const struct cgi_dispatcher cgi_dispatchers[] = {
         "View the current configuration",
 #endif
          TRUE },
-   { "show-version",
-         cgi_show_version,
-         "View the source code version numbers",
-          TRUE },
 #ifdef FEATURE_CLIENT_TAGS
+   /*
+    * This is marked as harmless because despite the description
+    * used in the menu the actual toggling is done through another
+    * path ("/toggle-client-tag").
+    */
    { "client-tags",
          cgi_show_client_tags,
          "View or toggle the tags that can be set based on the clients address",
-          FALSE },
+         TRUE },
 #endif
    { "show-request",
          cgi_show_request,
@@ -128,6 +120,12 @@ static const struct cgi_dispatcher cgi_dispatchers[] = {
          "Toggle Privoxy on or off",
          FALSE },
 #endif /* def FEATURE_TOGGLE */
+#ifdef FEATURE_CLIENT_TAGS
+   { "toggle-client-tag",
+         cgi_toggle_client_tag,
+         NULL,
+         FALSE },
+#endif
 #ifdef FEATURE_CGI_EDIT_ACTIONS
    { "edit-actions", /* Edit the actions list */
          cgi_edit_actions,
@@ -438,6 +436,7 @@ static int referrer_is_safe(const struct client_state *csp)
 {
    char *referrer;
    static const char alternative_prefix[] = "http://" CGI_SITE_1_HOST "/";
+   const char *trusted_cgi_referrer = csp->config->trusted_cgi_referrer;
 
    referrer = grep_cgi_referrer(csp);
 
@@ -452,6 +451,18 @@ static int referrer_is_safe(const struct client_state *csp)
    {
       /* Trustworthy referrer */
       log_error(LOG_LEVEL_CGI, "Granting access to %s, referrer %s is trustworthy.",
+         csp->http->url, referrer);
+
+      return TRUE;
+   }
+   else if ((trusted_cgi_referrer != NULL) && (0 == strncmp(referrer,
+            trusted_cgi_referrer, strlen(trusted_cgi_referrer))))
+   {
+      /*
+       * After some more testing this block should be merged with
+       * the previous one or the log level should bedowngraded.
+       */
+      log_error(LOG_LEVEL_INFO, "Granting access to %s based on trusted referrer %s",
          csp->http->url, referrer);
 
       return TRUE;
@@ -922,9 +933,7 @@ struct http_response *error_response(struct client_state *csp,
    }
    else if (!strcmp(templatename, "forwarding-failed"))
    {
-	  struct forward_spec const *fwds[MAX_FORWARD_URLS];
-	  int fwd_count = forward_url(csp, csp->http, fwds);
-      const struct forward_spec *fwd = fwds[0];
+      const struct forward_spec *fwd = forward_url(csp, csp->http);
       char *socks_type = NULL;
       if (fwd == NULL)
       {
@@ -1049,6 +1058,8 @@ jb_err cgi_error_disabled(const struct client_state *csp,
 
    assert(csp);
    assert(rsp);
+
+   rsp->status = strdup_or_die("403 Request not trusted or feature disabled");
 
    if (NULL == (exports = default_exports(csp, "cgi-error-disabled")))
    {
@@ -1386,7 +1397,7 @@ char *add_help_link(const char *item,
    }
    else
    {
-      string_append(&result, "https://");
+      string_append(&result, "http://");
       string_append(&result, CGI_SITE_2_HOST);
       string_append(&result, "/user-manual/");
    }
@@ -2315,15 +2326,12 @@ jb_err template_fill_for_cgi(const struct client_state *csp,
 #endif
    if (err == JB_ERR_FILE)
    {
-      free_map(exports);
-      return cgi_error_no_template(csp, rsp, templatename);
+      err = cgi_error_no_template(csp, rsp, templatename);
    }
-   else if (err)
+   else if (err == JB_ERR_OK)
    {
-      free_map(exports);
-      return err; /* JB_ERR_MEMORY */
+      err = template_fill(&rsp->body, exports);
    }
-   err = template_fill(&rsp->body, exports);
    free_map(exports);
    return err;
 }

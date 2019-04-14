@@ -1,14 +1,13 @@
-const char jbsockets_rcs[] = "$Id: jbsockets.c,v 1.137 2016/08/22 14:50:18 fabiankeil Exp $";
 /*********************************************************************
  *
  * File        :  $Source: /cvsroot/ijbswa/current/jbsockets.c,v $
  *
  * Purpose     :  Contains wrappers for system-specific sockets code,
- *                so that the rest of Junkbuster can be more
+ *                so that the rest of Privoxy can be more
  *                OS-independent.  Contains #ifdefs to make this work
  *                on many platforms.
  *
- * Copyright   :  Written by and Copyright (C) 2001-2016 the
+ * Copyright   :  Written by and Copyright (C) 2001-2017 the
  *                Privoxy team. http://www.privoxy.org/
  *
  *                Based on the Internet Junkbuster originally written
@@ -36,6 +35,8 @@ const char jbsockets_rcs[] = "$Id: jbsockets.c,v 1.137 2016/08/22 14:50:18 fabia
  *********************************************************************/
 
 
+#include "config.h"
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -48,6 +49,7 @@ const char jbsockets_rcs[] = "$Id: jbsockets.c,v 1.137 2016/08/22 14:50:18 fabia
 #ifndef STRICT
 #define STRICT
 #endif
+#include <winsock2.h>
 #include <windows.h>
 #include <sys/timeb.h>
 #include <io.h>
@@ -89,11 +91,9 @@ const char jbsockets_rcs[] = "$Id: jbsockets.c,v 1.137 2016/08/22 14:50:18 fabia
 #endif /* def __GLIBC__ */
 #endif /* HAVE_POLL */
 
-#include "config.h"
-
 #include "project.h"
 
- /* For mutex semaphores only */
+/* For mutex semaphores only */
 #include "jcc.h"
 
 #include "jbsockets.h"
@@ -113,16 +113,12 @@ const char jbsockets_rcs[] = "$Id: jbsockets.c,v 1.137 2016/08/22 14:50:18 fabia
 extern const char **dns_servers;
 extern int dns_servers_count;
 
-const char jbsockets_h_rcs[] = JBSOCKETS_H_VERSION;
-
 /*
  * Maximum number of gethostbyname(_r) retries in case of
  * soft errors (TRY_AGAIN).
  * XXX: Does it make sense to make this a config option?
  */
 #define MAX_DNS_RETRIES 10
-
-#define MAX_LISTEN_BACKLOG 128
 
 #ifdef HAVE_RFC2553
 static jb_socket rfc2553_connect_to(const char *host, int portnum, struct client_state *csp);
@@ -134,7 +130,8 @@ static jb_socket no_rfc2553_connect_to(const char *host, int portnum, struct cli
  *
  * Function    :  set_no_delay_flag
  *
- * Description :  Disables TCP coalescence for the given socket.
+ * Description :  Disables the Nagle algorithm (TCP send coalescence)
+ *                for the given socket.
  *
  * Parameters  :
  *          1  :  fd = The file descriptor to operate on
@@ -145,15 +142,15 @@ static jb_socket no_rfc2553_connect_to(const char *host, int portnum, struct cli
 static void set_no_delay_flag(int fd)
 {
 #ifdef TCP_NODELAY
-	int mi = 1;
+   int mi = 1;
 
-	if (setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &mi, sizeof(int)))
-	{
-		log_error(LOG_LEVEL_ERROR,
-			"Failed to disable TCP coalescence for socket %d", fd);
-	}
+   if (setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &mi, sizeof(int)))
+   {
+      log_error(LOG_LEVEL_ERROR,
+         "Failed to disable TCP coalescence for socket %d", fd);
+   }
 #else
-	#warning set_no_delay_flag() is a nop due to lack of TCP_NODELAY
+#warning set_no_delay_flag() is a nop due to lack of TCP_NODELAY
 #endif /* def TCP_NODELAY */
 }
 
@@ -175,256 +172,288 @@ static void set_no_delay_flag(int fd)
  *********************************************************************/
 jb_socket connect_to(const char *host, int portnum, struct client_state *csp)
 {
-	jb_socket fd;
-	int forwarded_connect_retries = 0;
+   jb_socket fd;
+   int forwarded_connect_retries = 0;
 
-	do
-	{
-		/*
-		 * XXX: The whole errno overloading is ridiculous and should
-		 *      be replaced with something sane and thread safe
-		 */
-		 /* errno = 0;*/
+   do
+   {
+      /*
+       * XXX: The whole errno overloading is ridiculous and should
+       *      be replaced with something sane and thread safe
+       */
+      /* errno = 0;*/
 #ifdef HAVE_RFC2553
-		fd = rfc2553_connect_to(host, portnum, csp);
+      fd = rfc2553_connect_to(host, portnum, csp);
 #else
-		fd = no_rfc2553_connect_to(host, portnum, csp);
+      fd = no_rfc2553_connect_to(host, portnum, csp);
 #endif
-		if ((fd != JB_INVALID_SOCKET) || (errno == EINVAL)
-			|| (csp->fwd == NULL)
-			|| ((csp->fwd->forward_host == NULL) && (csp->fwd->type == SOCKS_NONE)))
-		{
-			break;
-		}
-		forwarded_connect_retries++;
-		if (csp->config->forwarded_connect_retries != 0)
-		{
-			log_error(LOG_LEVEL_ERROR,
-				"Attempt %d of %d to connect to %s failed. Trying again.",
-				forwarded_connect_retries, csp->config->forwarded_connect_retries + 1, host);
-		}
+      if ((fd != JB_INVALID_SOCKET) || (errno == EINVAL)
+         || (csp->fwd == NULL)
+         || ((csp->fwd->forward_host == NULL) && (csp->fwd->type == SOCKS_NONE)))
+      {
+         break;
+      }
+      forwarded_connect_retries++;
+      if (csp->config->forwarded_connect_retries != 0)
+      {
+         log_error(LOG_LEVEL_ERROR,
+            "Attempt %d of %d to connect to %s failed. Trying again.",
+            forwarded_connect_retries, csp->config->forwarded_connect_retries + 1, host);
+      }
 
-	} while (forwarded_connect_retries < csp->config->forwarded_connect_retries);
+   } while (forwarded_connect_retries < csp->config->forwarded_connect_retries);
 
-	return fd;
+   return fd;
 }
 
 #ifdef HAVE_RFC2553
 /* Getaddrinfo implementation */
 static jb_socket rfc2553_connect_to(const char *host, int portnum, struct client_state *csp)
 {
-	struct addrinfo hints, *result, *rp;
-	char service[6];
-	int retval;
-	jb_socket fd;
-	fd_set wfds;
-	struct timeval timeout;
-#if !defined(_WIN32) && !defined(__BEOS__) && !defined(AMIGA) && !defined(__OS2__)
-	int   flags;
+   struct addrinfo hints, *result, *rp;
+   char service[6];
+   int retval;
+   jb_socket fd;
+#ifdef HAVE_POLL
+   struct pollfd poll_fd[1];
+#else
+   fd_set wfds;
+   struct timeval timeout;
 #endif
-	int connect_failed;
-	/*
-	 * XXX: Initializeing it here is only necessary
-	 *      because not all situations are properly
-	 *      covered yet.
-	 */
-	int socket_error = 0;
+#if !defined(_WIN32) && !defined(__BEOS__) && !defined(__OS2__)
+   int   flags;
+#endif
+   int connect_failed;
+   /*
+    * XXX: Initializeing it here is only necessary
+    *      because not all situations are properly
+    *      covered yet.
+    */
+   int socket_error = 0;
 
 #ifdef FEATURE_ACL
-	struct access_control_addr dst[1];
+   struct access_control_addr dst[1];
 #endif /* def FEATURE_ACL */
 
-	/* Don't leak memory when retrying. */
-	freez(csp->error_message);
-	freez(csp->http->host_ip_addr_str);
+   /* Don't leak memory when retrying. */
+   freez(csp->error_message);
+   freez(csp->http->host_ip_addr_str);
 
-	retval = snprintf(service, sizeof(service), "%d", portnum);
-	if ((-1 == retval) || (sizeof(service) <= retval))
-	{
-		log_error(LOG_LEVEL_ERROR,
-			"Port number (%d) ASCII decimal representation doesn't fit into 6 bytes",
-			portnum);
-		csp->error_message = strdup("Invalid port number");
-		csp->http->host_ip_addr_str = strdup("unknown");
-		return(JB_INVALID_SOCKET);
-	}
+   retval = snprintf(service, sizeof(service), "%d", portnum);
+   if ((-1 == retval) || (sizeof(service) <= retval))
+   {
+      log_error(LOG_LEVEL_ERROR,
+         "Port number (%d) ASCII decimal representation doesn't fit into 6 bytes",
+         portnum);
+      csp->error_message = strdup("Invalid port number");
+      csp->http->host_ip_addr_str = strdup("unknown");
+      return(JB_INVALID_SOCKET);
+   }
 
-	memset((char *)&hints, 0, sizeof(hints));
-	hints.ai_family = AF_UNSPEC;
-	hints.ai_socktype = SOCK_STREAM;
-	hints.ai_flags = AI_NUMERICSERV; /* avoid service look-up */
+   memset((char *)&hints, 0, sizeof(hints));
+   hints.ai_family = AF_UNSPEC;
+   hints.ai_socktype = SOCK_STREAM;
+   hints.ai_flags = AI_NUMERICSERV; /* avoid service look-up */
 #ifdef AI_ADDRCONFIG
-	hints.ai_flags |= AI_ADDRCONFIG;
+   hints.ai_flags |= AI_ADDRCONFIG;
 #endif
-	if ((retval = getaddrinfo(host, service, &hints, &result)))
-	{
-		log_error(LOG_LEVEL_INFO,
-			"Can not resolve %s: %s", host, gai_strerror(retval));
-		/* XXX: Should find a better way to propagate this error. */
-		errno = EINVAL;
-		csp->error_message = strdup(gai_strerror(retval));
-		csp->http->host_ip_addr_str = strdup("unknown");
-		return(JB_INVALID_SOCKET);
-	}
+   if ((retval = getaddrinfo(host, service, &hints, &result)))
+   {
+      log_error(LOG_LEVEL_INFO,
+         "Can not resolve %s: %s", host, gai_strerror(retval));
+      /* XXX: Should find a better way to propagate this error. */
+      errno = EINVAL;
+      csp->error_message = strdup(gai_strerror(retval));
+      csp->http->host_ip_addr_str = strdup("unknown");
+      return(JB_INVALID_SOCKET);
+   }
 
-	csp->http->host_ip_addr_str = malloc_or_die(NI_MAXHOST);
+   csp->http->host_ip_addr_str = malloc_or_die(NI_MAXHOST);
 
-	for (rp = result; rp != NULL; rp = rp->ai_next)
-	{
+   for (rp = result; rp != NULL; rp = rp->ai_next)
+   {
 
 #ifdef FEATURE_ACL
-		memcpy(&dst->addr, rp->ai_addr, rp->ai_addrlen);
+      memcpy(&dst->addr, rp->ai_addr, rp->ai_addrlen);
 
-		if (block_acl(dst, csp))
-		{
+      if (block_acl(dst, csp))
+      {
 #ifdef __OS2__
-			socket_error = errno = SOCEPERM;
+         socket_error = errno = SOCEPERM;
 #else
-			socket_error = errno = EPERM;
+         socket_error = errno = EPERM;
 #endif
-			continue;
-		}
+         continue;
+      }
 #endif /* def FEATURE_ACL */
 
-		retval = getnameinfo(rp->ai_addr, rp->ai_addrlen,
-			csp->http->host_ip_addr_str, NI_MAXHOST, NULL, 0, NI_NUMERICHOST);
-		if (retval)
-		{
-			log_error(LOG_LEVEL_ERROR,
-				"Failed to get the host name from the socket structure: %s",
-				gai_strerror(retval));
-			continue;
-		}
+      retval = getnameinfo(rp->ai_addr, rp->ai_addrlen,
+         csp->http->host_ip_addr_str, NI_MAXHOST, NULL, 0, NI_NUMERICHOST);
+      if (retval)
+      {
+         log_error(LOG_LEVEL_ERROR,
+            "Failed to get the host name from the socket structure: %s",
+            gai_strerror(retval));
+         continue;
+      }
 
-		fd = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
+      fd = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
 #ifdef _WIN32
-		if (fd == JB_INVALID_SOCKET)
+      if (fd == JB_INVALID_SOCKET)
 #else
-		if (fd < 0)
+      if (fd < 0)
 #endif
-		{
-			continue;
-		}
+      {
+         continue;
+      }
 
+#ifndef HAVE_POLL
 #ifndef _WIN32
-		if (fd >= FD_SETSIZE)
-		{
-			log_error(LOG_LEVEL_ERROR,
-				"Server socket number too high to use select(): %d >= %d",
-				fd, FD_SETSIZE);
-			close_socket(fd);
-			freeaddrinfo(result);
-			return JB_INVALID_SOCKET;
-		}
+      if (fd >= FD_SETSIZE)
+      {
+         log_error(LOG_LEVEL_ERROR,
+            "Server socket number too high to use select(): %d >= %d",
+            fd, FD_SETSIZE);
+         close_socket(fd);
+         freeaddrinfo(result);
+         return JB_INVALID_SOCKET;
+      }
+#endif
 #endif
 
 #ifdef FEATURE_EXTERNAL_FILTERS
-		mark_socket_for_close_on_execute(fd);
+      mark_socket_for_close_on_execute(fd);
 #endif
 
-		set_no_delay_flag(fd);
+      set_no_delay_flag(fd);
 
-#if !defined(_WIN32) && !defined(__BEOS__) && !defined(AMIGA) && !defined(__OS2__)
-		if ((flags = fcntl(fd, F_GETFL, 0)) != -1)
-		{
-			flags |= O_NDELAY;
-			fcntl(fd, F_SETFL, flags);
-		}
-#endif /* !defined(_WIN32) && !defined(__BEOS__) && !defined(AMIGA) && !defined(__OS2__) */
+#if !defined(_WIN32) && !defined(__BEOS__) && !defined(__OS2__)
+      if ((flags = fcntl(fd, F_GETFL, 0)) != -1)
+      {
+         flags |= O_NDELAY;
+         fcntl(fd, F_SETFL, flags);
+      }
+#endif /* !defined(_WIN32) && !defined(__BEOS__) && !defined(__OS2__) */
 
-		connect_failed = 0;
-		while (connect(fd, rp->ai_addr, rp->ai_addrlen) == JB_INVALID_SOCKET)
-		{
+      connect_failed = 0;
+      while (connect(fd, rp->ai_addr, rp->ai_addrlen) == JB_INVALID_SOCKET)
+      {
 #ifdef __OS2__
-			errno = sock_errno();
+         errno = sock_errno();
 #endif /* __OS2__ */
 
 #ifdef _WIN32
-			if (errno == WSAEINPROGRESS)
+         if (errno == WSAEINPROGRESS)
 #else /* ifndef _WIN32 */
-			if (errno == EINPROGRESS)
+         if (errno == EINPROGRESS)
 #endif /* ndef _WIN32 || __OS2__ */
-			{
-				break;
-			}
+         {
+            break;
+         }
 
-			if (errno != EINTR)
-			{
-				socket_error = errno;
-				close_socket(fd);
-				connect_failed = 1;
-				break;
-			}
-		}
-		if (connect_failed)
-		{
-			continue;
-		}
+         if (errno != EINTR)
+         {
+            socket_error = errno;
+            close_socket(fd);
+            connect_failed = 1;
+            break;
+         }
+      }
+      if (connect_failed)
+      {
+         continue;
+      }
 
-#if !defined(_WIN32) && !defined(__BEOS__) && !defined(AMIGA) && !defined(__OS2__)
-		if (flags != -1)
-		{
-			flags &= ~O_NDELAY;
-			fcntl(fd, F_SETFL, flags);
-		}
-#endif /* !defined(_WIN32) && !defined(__BEOS__) && !defined(AMIGA) && !defined(__OS2__) */
+#if !defined(_WIN32) && !defined(__BEOS__) && !defined(__OS2__)
+      if (flags != -1)
+      {
+         flags &= ~O_NDELAY;
+         fcntl(fd, F_SETFL, flags);
+      }
+#endif /* !defined(_WIN32) && !defined(__BEOS__) && !defined(__OS2__) */
 
-		/* wait for connection to complete */
-		FD_ZERO(&wfds);
-		FD_SET(fd, &wfds);
+#ifdef HAVE_POLL
+      poll_fd[0].fd = fd;
+      poll_fd[0].events = POLLOUT;
 
-		memset(&timeout, 0, sizeof(timeout));
-		timeout.tv_sec = 30;
+      retval = poll(poll_fd, 1, 30000);
+      if (retval == 0)
+      {
+         if (rp->ai_next != NULL)
+         {
+            /* Log this now as we'll try another address next */
+            log_error(LOG_LEVEL_CONNECT,
+               "Could not connect to [%s]:%s: Operation timed out.",
+               csp->http->host_ip_addr_str, service);
+         }
+         else
+         {
+            /*
+             * This is the last address, don't log this now
+             * as it would result in a duplicated log message.
+             */
+            socket_error = ETIMEDOUT;
+         }
+      }
+      else if (retval > 0)
+#else
+      /* wait for connection to complete */
+      FD_ZERO(&wfds);
+      FD_SET(fd, &wfds);
 
-		/* MS Windows uses int, not SOCKET, for the 1st arg of select(). Weird! */
-		if ((select((int)fd + 1, NULL, &wfds, NULL, &timeout) > 0)
-			&& FD_ISSET(fd, &wfds))
-		{
-			socklen_t optlen = sizeof(socket_error);
-			if (!getsockopt(fd, SOL_SOCKET, SO_ERROR, &socket_error, &optlen))
-			{
-				if (!socket_error)
-				{
-					/* Connection established, no need to try other addresses. */
-					break;
-				}
-				if (rp->ai_next != NULL)
-				{
-					/*
-					 * There's another address we can try, so log that this
-					 * one didn't work out. If the last one fails, too,
-					 * it will get logged outside the loop body so we don't
-					 * have to mention it here.
-					 */
-					log_error(LOG_LEVEL_CONNECT, "Could not connect to [%s]:%s: %s.",
-						csp->http->host_ip_addr_str, service, strerror(socket_error));
-				}
-			}
-			else
-			{
-				socket_error = errno;
-				log_error(LOG_LEVEL_ERROR, "Could not get the state of "
-					"the connection to [%s]:%s: %s; dropping connection.",
-					csp->http->host_ip_addr_str, service, strerror(errno));
-			}
-		}
+      memset(&timeout, 0, sizeof(timeout));
+      timeout.tv_sec  = 30;
 
-		/* Connection failed, try next address */
-		close_socket(fd);
-	}
+      /* MS Windows uses int, not SOCKET, for the 1st arg of select(). Weird! */
+      if ((select((int)fd + 1, NULL, &wfds, NULL, &timeout) > 0)
+         && FD_ISSET(fd, &wfds))
+#endif
+      {
+         socklen_t optlen = sizeof(socket_error);
+         if (!getsockopt(fd, SOL_SOCKET, SO_ERROR, &socket_error, &optlen))
+         {
+            if (!socket_error)
+            {
+               /* Connection established, no need to try other addresses. */
+               break;
+            }
+            if (rp->ai_next != NULL)
+            {
+               /*
+                * There's another address we can try, so log that this
+                * one didn't work out. If the last one fails, too,
+                * it will get logged outside the loop body so we don't
+                * have to mention it here.
+                */
+               log_error(LOG_LEVEL_CONNECT, "Could not connect to [%s]:%s: %s.",
+                  csp->http->host_ip_addr_str, service, strerror(socket_error));
+            }
+         }
+         else
+         {
+            socket_error = errno;
+            log_error(LOG_LEVEL_ERROR, "Could not get the state of "
+               "the connection to [%s]:%s: %s; dropping connection.",
+               csp->http->host_ip_addr_str, service, strerror(errno));
+         }
+      }
 
-	freeaddrinfo(result);
-	if (!rp)
-	{
-		log_error(LOG_LEVEL_CONNECT, "Could not connect to [%s]:%s: %s.",
-			host, service, strerror(socket_error));
-		csp->error_message = strdup(strerror(socket_error));
-		return(JB_INVALID_SOCKET);
-	}
-	log_error(LOG_LEVEL_CONNECT, "Connected to %s[%s]:%s.",
-		host, csp->http->host_ip_addr_str, service);
+      /* Connection failed, try next address */
+      close_socket(fd);
+   }
 
-	return(fd);
+   freeaddrinfo(result);
+   if (!rp)
+   {
+      log_error(LOG_LEVEL_CONNECT, "Could not connect to [%s]:%s: %s.",
+         host, service, strerror(socket_error));
+      csp->error_message = strdup(strerror(socket_error));
+      return(JB_INVALID_SOCKET);
+   }
+   log_error(LOG_LEVEL_CONNECT, "Connected to %s[%s]:%s.",
+      host, csp->http->host_ip_addr_str, service);
+
+   return(fd);
 
 }
 
@@ -433,143 +462,155 @@ static jb_socket rfc2553_connect_to(const char *host, int portnum, struct client
 
 static jb_socket no_rfc2553_connect_to(const char *host, int portnum, struct client_state *csp)
 {
-	struct sockaddr_in inaddr;
-	jb_socket fd;
-	unsigned int addr;
-	fd_set wfds;
-	struct timeval tv[1];
-#if !defined(_WIN32) && !defined(__BEOS__) && !defined(AMIGA) && !defined(__OS2__)
-	int   flags;
+   struct sockaddr_in inaddr;
+   jb_socket fd;
+   unsigned int addr;
+#ifdef HAVE_POLL
+   struct pollfd poll_fd[1];
+#else
+   fd_set wfds;
+   struct timeval tv[1];
+#endif
+#if !defined(_WIN32) && !defined(__BEOS__) && !defined(__OS2__)
+   int   flags;
 #endif
 
 #ifdef FEATURE_ACL
-	struct access_control_addr dst[1];
+   struct access_control_addr dst[1];
 #endif /* def FEATURE_ACL */
 
-	/* Don't leak memory when retrying. */
-	freez(csp->http->host_ip_addr_str);
+   /* Don't leak memory when retrying. */
+   freez(csp->http->host_ip_addr_str);
 
-	memset((char *)&inaddr, 0, sizeof inaddr);
+   memset((char *)&inaddr, 0, sizeof inaddr);
 
-	if ((addr = resolve_hostname_to_ip(host)) == INADDR_NONE)
-	{
-		csp->http->host_ip_addr_str = strdup("unknown");
-		return(JB_INVALID_SOCKET);
-	}
+   if ((addr = resolve_hostname_to_ip(host)) == INADDR_NONE)
+   {
+      csp->http->host_ip_addr_str = strdup("unknown");
+      return(JB_INVALID_SOCKET);
+   }
 
 #ifdef FEATURE_ACL
-	dst->addr = ntohl(addr);
-	dst->port = portnum;
+   dst->addr = ntohl(addr);
+   dst->port = portnum;
 
-	if (block_acl(dst, csp))
-	{
+   if (block_acl(dst, csp))
+   {
 #ifdef __OS2__
-		errno = SOCEPERM;
+      errno = SOCEPERM;
 #else
-		errno = EPERM;
+      errno = EPERM;
 #endif
-		return(JB_INVALID_SOCKET);
-	}
+      return(JB_INVALID_SOCKET);
+   }
 #endif /* def FEATURE_ACL */
 
-	inaddr.sin_addr.s_addr = addr;
-	inaddr.sin_family = AF_INET;
-	csp->http->host_ip_addr_str = strdup(inet_ntoa(inaddr.sin_addr));
+   inaddr.sin_addr.s_addr = addr;
+   inaddr.sin_family      = AF_INET;
+   csp->http->host_ip_addr_str = strdup(inet_ntoa(inaddr.sin_addr));
 
 #ifndef _WIN32
-	if (sizeof(inaddr.sin_port) == sizeof(short))
+   if (sizeof(inaddr.sin_port) == sizeof(short))
 #endif /* ndef _WIN32 */
-	{
-		inaddr.sin_port = htons((unsigned short)portnum);
-	}
+   {
+      inaddr.sin_port = htons((unsigned short) portnum);
+   }
 #ifndef _WIN32
-	else
-	{
-		inaddr.sin_port = htonl((unsigned long)portnum);
-	}
+   else
+   {
+      inaddr.sin_port = htonl((unsigned long)portnum);
+   }
 #endif /* ndef _WIN32 */
 
-	fd = socket(inaddr.sin_family, SOCK_STREAM, 0);
+   fd = socket(inaddr.sin_family, SOCK_STREAM, 0);
 #ifdef _WIN32
-	if (fd == JB_INVALID_SOCKET)
+   if (fd == JB_INVALID_SOCKET)
 #else
-	if (fd < 0)
+   if (fd < 0)
 #endif
-	{
-		return(JB_INVALID_SOCKET);
-	}
+   {
+      return(JB_INVALID_SOCKET);
+   }
 
+#ifndef HAVE_POLL
 #ifndef _WIN32
-	if (fd >= FD_SETSIZE)
-	{
-		log_error(LOG_LEVEL_ERROR,
-			"Server socket number too high to use select(): %d >= %d",
-			fd, FD_SETSIZE);
-		close_socket(fd);
-		return JB_INVALID_SOCKET;
-	}
+   if (fd >= FD_SETSIZE)
+   {
+      log_error(LOG_LEVEL_ERROR,
+         "Server socket number too high to use select(): %d >= %d",
+         fd, FD_SETSIZE);
+      close_socket(fd);
+      return JB_INVALID_SOCKET;
+   }
+#endif
 #endif
 
-	set_no_delay_flag(fd);
+   set_no_delay_flag(fd);
 
-#if !defined(_WIN32) && !defined(__BEOS__) && !defined(AMIGA) && !defined(__OS2__)
-	if ((flags = fcntl(fd, F_GETFL, 0)) != -1)
-	{
-		flags |= O_NDELAY;
-		fcntl(fd, F_SETFL, flags);
+#if !defined(_WIN32) && !defined(__BEOS__) && !defined(__OS2__)
+   if ((flags = fcntl(fd, F_GETFL, 0)) != -1)
+   {
+      flags |= O_NDELAY;
+      fcntl(fd, F_SETFL, flags);
 #ifdef FEATURE_EXTERNAL_FILTERS
-		mark_socket_for_close_on_execute(fd);
+      mark_socket_for_close_on_execute(fd);
 #endif
-	}
-#endif /* !defined(_WIN32) && !defined(__BEOS__) && !defined(AMIGA) && !defined(__OS2__) */
+   }
+#endif /* !defined(_WIN32) && !defined(__BEOS__) && !defined(__OS2__) */
 
-	while (connect(fd, (struct sockaddr *) & inaddr, sizeof inaddr) == JB_INVALID_SOCKET)
-	{
+   while (connect(fd, (struct sockaddr *) & inaddr, sizeof inaddr) == JB_INVALID_SOCKET)
+   {
 #ifdef _WIN32
-		if (errno == WSAEINPROGRESS)
+      if (errno == WSAEINPROGRESS)
 #elif __OS2__
-		if (sock_errno() == EINPROGRESS)
+      if (sock_errno() == EINPROGRESS)
 #else /* ifndef _WIN32 */
-		if (errno == EINPROGRESS)
+      if (errno == EINPROGRESS)
 #endif /* ndef _WIN32 || __OS2__ */
-		{
-			break;
-		}
+      {
+         break;
+      }
 
 #ifdef __OS2__
-		if (sock_errno() != EINTR)
+      if (sock_errno() != EINTR)
 #else
-		if (errno != EINTR)
+      if (errno != EINTR)
 #endif /* __OS2__ */
-		{
-			close_socket(fd);
-			return(JB_INVALID_SOCKET);
-		}
-	}
+      {
+         close_socket(fd);
+         return(JB_INVALID_SOCKET);
+      }
+   }
 
-#if !defined(_WIN32) && !defined(__BEOS__) && !defined(AMIGA) && !defined(__OS2__)
-	if (flags != -1)
-	{
-		flags &= ~O_NDELAY;
-		fcntl(fd, F_SETFL, flags);
-	}
-#endif /* !defined(_WIN32) && !defined(__BEOS__) && !defined(AMIGA) && !defined(__OS2__) */
+#if !defined(_WIN32) && !defined(__BEOS__) && !defined(__OS2__)
+   if (flags != -1)
+   {
+      flags &= ~O_NDELAY;
+      fcntl(fd, F_SETFL, flags);
+   }
+#endif /* !defined(_WIN32) && !defined(__BEOS__) && !defined(__OS2__) */
 
-	/* wait for connection to complete */
-	FD_ZERO(&wfds);
-	FD_SET(fd, &wfds);
+#ifdef HAVE_POLL
+   poll_fd[0].fd = fd;
+   poll_fd[0].events = POLLOUT;
 
-	tv->tv_sec = FORWARD_CONNECT_TIMEOUT;
-	/* tv->tv_sec = 30; */
-	tv->tv_usec = 0;
+   if (poll(poll_fd, 1, 30000) <= 0)
+#else
+   /* wait for connection to complete */
+   FD_ZERO(&wfds);
+   FD_SET(fd, &wfds);
 
-	/* MS Windows uses int, not SOCKET, for the 1st arg of select(). Weird! */
-	if (select((int)fd + 1, NULL, &wfds, NULL, tv) <= 0)
-	{
-		close_socket(fd);
-		return(JB_INVALID_SOCKET);
-	}
-	return(fd);
+   tv->tv_sec  = 30;
+   tv->tv_usec = 0;
+
+   /* MS Windows uses int, not SOCKET, for the 1st arg of select(). Weird! */
+   if (select((int)fd + 1, NULL, &wfds, NULL, tv) <= 0)
+#endif
+   {
+      close_socket(fd);
+      return(JB_INVALID_SOCKET);
+   }
+   return(fd);
 
 }
 #endif /* ndef HAVE_RFC2553 */
@@ -590,47 +631,105 @@ static jb_socket no_rfc2553_connect_to(const char *host, int portnum, struct cli
  *                nonzero on error.
  *
  *********************************************************************/
-#ifdef AMIGA
-int write_socket(jb_socket fd, const char *buf, ssize_t len)
-#else
 int write_socket(jb_socket fd, const char *buf, size_t len)
-#endif
 {
-	if (len == 0)
-	{
-		return 0;
-	}
+   if (len == 0)
+   {
+      return 0;
+   }
 
-	log_error(LOG_LEVEL_WRITING, "to socket %d: %N", fd, len, buf);
+#ifdef FUZZ
+   if (!daemon_mode && fd <= 3)
+   {
+      log_error(LOG_LEVEL_WRITING, "Pretending to write to socket %d: %N", fd, len, buf);
+      return 0;
+   }
+#endif
+
+   log_error(LOG_LEVEL_WRITING, "to socket %d: %N", fd, len, buf);
 
 #if defined(_WIN32)
-	return (send(fd, buf, (int)len, 0) != (int)len);
-#elif defined(__BEOS__) || defined(AMIGA)
-	return (send(fd, buf, len, 0) != len);
+   return (send(fd, buf, (int)len, 0) != (int)len);
+#elif defined(__BEOS__)
+   return (send(fd, buf, len, 0) != len);
 #elif defined(__OS2__)
-	/*
-	 * Break the data up into SOCKET_SEND_MAX chunks for sending...
-	 * OS/2 seemed to complain when the chunks were too large.
-	 */
+   /*
+    * Break the data up into SOCKET_SEND_MAX chunks for sending...
+    * OS/2 seemed to complain when the chunks were too large.
+    */
 #define SOCKET_SEND_MAX 65000
-	{
-		int send_len, send_rc = 0, i = 0;
-		while ((i < len) && (send_rc != -1))
-		{
-			if ((i + SOCKET_SEND_MAX) > len)
-				send_len = len - i;
-			else
-				send_len = SOCKET_SEND_MAX;
-			send_rc = send(fd, (char*)buf + i, send_len, 0);
-			if (send_rc == -1)
-				return 1;
-			i = i + send_len;
-		}
-		return 0;
-	}
+   {
+      int send_len, send_rc = 0, i = 0;
+      while ((i < len) && (send_rc != -1))
+      {
+         if ((i + SOCKET_SEND_MAX) > len)
+            send_len = len - i;
+         else
+            send_len = SOCKET_SEND_MAX;
+         send_rc = send(fd,(char*)buf + i, send_len, 0);
+         if (send_rc == -1)
+            return 1;
+         i = i + send_len;
+      }
+      return 0;
+   }
 #else
-	return (write(fd, buf, len) != len);
+   return (write(fd, buf, len) != len);
 #endif
+
+}
+
+
+/*********************************************************************
+ *
+ * Function    :  write_socket_delayed
+ *
+ * Description :  Write the contents of buf (for n bytes) to
+ *                socket fd, optionally delaying the operation.
+ *
+ * Parameters  :
+ *          1  :  fd = File descriptor (aka. handle) of socket to write to.
+ *          2  :  buf = Pointer to data to be written.
+ *          3  :  len = Length of data to be written to the socket "fd".
+ *          4  :  delay = Delay in milliseconds.
+ *
+ * Returns     :  0 on success (entire buffer sent).
+ *                nonzero on error.
+ *
+ *********************************************************************/
+int write_socket_delayed(jb_socket fd, const char *buf, size_t len, unsigned int delay)
+{
+   size_t i = 0;
+
+   if (delay == 0)
+   {
+      return write_socket(fd, buf, len);
+   }
+
+   while (i < len)
+   {
+      size_t write_length;
+      enum {MAX_WRITE_LENGTH = 10};
+
+      if ((i + MAX_WRITE_LENGTH) > len)
+      {
+         write_length = len - i;
+      }
+      else
+      {
+         write_length = MAX_WRITE_LENGTH;
+      }
+
+      privoxy_millisleep(delay);
+
+      if (write_socket(fd, buf + i, write_length) != 0)
+      {
+         return 1;
+      }
+      i += write_length;
+   }
+
+   return 0;
 
 }
 
@@ -662,27 +761,27 @@ int write_socket(jb_socket fd, const char *buf, size_t len)
  *********************************************************************/
 int read_socket(jb_socket fd, char *buf, int len)
 {
-	int ret;
+   int ret;
 
-	if (len <= 0)
-	{
-		return(0);
-	}
+   if (len <= 0)
+   {
+      return(0);
+   }
 
 #if defined(_WIN32)
-	ret = recv(fd, buf, len, 0);
-#elif defined(__BEOS__) || defined(AMIGA) || defined(__OS2__)
-	ret = recv(fd, buf, (size_t)len, 0);
+   ret = recv(fd, buf, len, 0);
+#elif defined(__BEOS__) || defined(__OS2__)
+   ret = recv(fd, buf, (size_t)len, 0);
 #else
-	ret = (int)read(fd, buf, (size_t)len);
+   ret = (int)read(fd, buf, (size_t)len);
 #endif
 
-	if (ret > 0)
-	{
-		log_error(LOG_LEVEL_RECEIVED, "from socket %d: %N", fd, ret, buf);
-	}
+   if (ret > 0)
+   {
+      log_error(LOG_LEVEL_RECEIVED, "from socket %d: %N", fd, ret, buf);
+   }
 
-	return ret;
+   return ret;
 }
 
 
@@ -702,28 +801,37 @@ int read_socket(jb_socket fd, char *buf, int len)
  *********************************************************************/
 int data_is_available(jb_socket fd, int seconds_to_wait)
 {
-	char buf[10];
-	fd_set rfds;
-	struct timeval timeout;
-	int n;
+   int n;
+   char buf[10];
+#ifdef HAVE_POLL
+   struct pollfd poll_fd[1];
 
-	memset(&timeout, 0, sizeof(timeout));
-	timeout.tv_sec = seconds_to_wait;
+   poll_fd[0].fd = fd;
+   poll_fd[0].events = POLLIN;
+
+   n = poll(poll_fd, 1, seconds_to_wait * 1000);
+#else
+   fd_set rfds;
+   struct timeval timeout;
+
+   memset(&timeout, 0, sizeof(timeout));
+   timeout.tv_sec = seconds_to_wait;
 
 #ifdef __OS2__
-	/* Copy and pasted from jcc.c ... */
-	memset(&rfds, 0, sizeof(fd_set));
+   /* Copy and pasted from jcc.c ... */
+   memset(&rfds, 0, sizeof(fd_set));
 #else
-	FD_ZERO(&rfds);
+   FD_ZERO(&rfds);
 #endif
-	FD_SET(fd, &rfds);
+   FD_SET(fd, &rfds);
 
-	n = select(fd + 1, &rfds, NULL, NULL, &timeout);
+   n = select(fd+1, &rfds, NULL, NULL, &timeout);
+#endif
 
-	/*
-	 * XXX: Do we care about the different error conditions?
-	 */
-	return ((n == 1) && (1 == recv(fd, buf, 1, MSG_PEEK)));
+   /*
+    * XXX: Do we care about the different error conditions?
+    */
+   return ((n == 1) && (1 == recv(fd, buf, 1, MSG_PEEK)));
 }
 
 
@@ -742,13 +850,11 @@ int data_is_available(jb_socket fd, int seconds_to_wait)
 void close_socket(jb_socket fd)
 {
 #if defined(_WIN32) || defined(__BEOS__)
-	closesocket(fd);
-#elif defined(AMIGA)
-	CloseSocket(fd);
+   closesocket(fd);
 #elif defined(__OS2__)
-	soclose(fd);
+   soclose(fd);
 #else
-	close(fd);
+   close(fd);
 #endif
 }
 
@@ -768,59 +874,59 @@ void close_socket(jb_socket fd)
 void drain_and_close_socket(jb_socket fd)
 {
 #ifdef FEATURE_CONNECTION_KEEP_ALIVE
-	if (socket_is_still_alive(fd))
+   if (socket_is_still_alive(fd))
 #endif
-	{
-		int bytes_drained_total = 0;
-		int bytes_drained;
+   {
+      int bytes_drained_total = 0;
+      int bytes_drained;
 
 #ifdef HAVE_SHUTDOWN
-		/* Apparently Windows has shutdown() but not SHUT_WR. */
+/* Apparently Windows has shutdown() but not SHUT_WR. */
 #ifndef SHUT_WR
 #define SHUT_WR 1
 #endif
-		if (0 != shutdown(fd, SHUT_WR))
-		{
-			log_error(LOG_LEVEL_CONNECT, "Failed to shutdown socket %d: %E", fd);
-		}
+      if (0 != shutdown(fd, SHUT_WR))
+      {
+         log_error(LOG_LEVEL_CONNECT, "Failed to shutdown socket %d: %E", fd);
+      }
 #endif
 #define ARBITRARY_DRAIN_LIMIT 10000
-		do
-		{
-			char drainage[500];
+      do
+      {
+         char drainage[500];
 
-			if (!data_is_available(fd, 0))
-			{
-				/*
-				 * If there is no data available right now, don't try
-				 * to drain the socket as read_socket() could block.
-				 */
-				break;
-			}
+         if (!data_is_available(fd, 0))
+         {
+            /*
+             * If there is no data available right now, don't try
+             * to drain the socket as read_socket() could block.
+             */
+            break;
+         }
 
-			bytes_drained = read_socket(fd, drainage, sizeof(drainage));
-			if (bytes_drained < 0)
-			{
-				log_error(LOG_LEVEL_CONNECT, "Failed to drain socket %d: %E", fd);
-			}
-			else if (bytes_drained > 0)
-			{
-				bytes_drained_total += bytes_drained;
-				if (bytes_drained_total > ARBITRARY_DRAIN_LIMIT)
-				{
-					log_error(LOG_LEVEL_CONNECT, "Giving up draining socket %d", fd);
-					break;
-				}
-			}
-		} while (bytes_drained > 0);
-		if (bytes_drained_total != 0)
-		{
-			log_error(LOG_LEVEL_CONNECT,
-				"Drained %d bytes before closing socket %d", bytes_drained_total, fd);
-		}
-	}
+         bytes_drained = read_socket(fd, drainage, sizeof(drainage));
+         if (bytes_drained < 0)
+         {
+            log_error(LOG_LEVEL_CONNECT, "Failed to drain socket %d: %E", fd);
+         }
+         else if (bytes_drained > 0)
+         {
+            bytes_drained_total += bytes_drained;
+            if (bytes_drained_total > ARBITRARY_DRAIN_LIMIT)
+            {
+               log_error(LOG_LEVEL_CONNECT, "Giving up draining socket %d", fd);
+               break;
+            }
+         }
+      } while (bytes_drained > 0);
+      if (bytes_drained_total != 0)
+      {
+         log_error(LOG_LEVEL_CONNECT,
+            "Drained %d bytes before closing socket %d", bytes_drained_total, fd);
+      }
+   }
 
-	close_socket(fd);
+   close_socket(fd);
 
 }
 
@@ -835,199 +941,200 @@ void drain_and_close_socket(jb_socket fd)
  * Parameters  :
  *          1  :  hostnam = TCP/IP address to bind/listen to
  *          2  :  portnum = port to listen on
- *          3  :  pfd = pointer used to return file descriptor.
+ *          3  :  backlog = Listen backlog
+ *          4  :  pfd = pointer used to return file descriptor.
  *
  * Returns     :  if success, returns 0 and sets *pfd.
  *                if failure, returns -3 if address is in use,
  *                                    -2 if address unresolvable,
  *                                    -1 otherwise
  *********************************************************************/
-int bind_port(const char *hostnam, int portnum, jb_socket *pfd)
+int bind_port(const char *hostnam, int portnum, int backlog, jb_socket *pfd)
 {
 #ifdef HAVE_RFC2553
-	struct addrinfo hints;
-	struct addrinfo *result, *rp;
-	/*
-	 * XXX: portnum should be a string to allow symbolic service
-	 * names in the configuration file and to avoid the following
-	 * int2string.
-	 */
-	char servnam[6];
-	int retval;
+   struct addrinfo hints;
+   struct addrinfo *result, *rp;
+   /*
+    * XXX: portnum should be a string to allow symbolic service
+    * names in the configuration file and to avoid the following
+    * int2string.
+    */
+   char servnam[6];
+   int retval;
 #else
-	struct sockaddr_in inaddr;
+   struct sockaddr_in inaddr;
 #endif /* def HAVE_RFC2553 */
-	jb_socket fd;
+   jb_socket fd;
 #ifndef _WIN32
-	int one = 1;
+   int one = 1;
 #endif /* ndef _WIN32 */
 
-	*pfd = JB_INVALID_SOCKET;
+   *pfd = JB_INVALID_SOCKET;
 
 #ifdef HAVE_RFC2553
-	retval = snprintf(servnam, sizeof(servnam), "%d", portnum);
-	if ((-1 == retval) || (sizeof(servnam) <= retval))
-	{
-		log_error(LOG_LEVEL_ERROR,
-			"Port number (%d) ASCII decimal representation doesn't fit into 6 bytes",
-			portnum);
-		return -1;
-	}
-
-	memset(&hints, 0, sizeof(struct addrinfo));
-	if (hostnam == NULL)
-	{
-		/*
-		 * XXX: This is a hack. The right thing to do
-		 * would be to bind to both AF_INET and AF_INET6.
-		 * This will also fail if there is no AF_INET
-		 * version available.
-		 */
-		hints.ai_family = AF_INET;
-	}
-	else
-	{
-		hints.ai_family = AF_UNSPEC;
-	}
-	hints.ai_socktype = SOCK_STREAM;
-	hints.ai_flags = AI_PASSIVE;
-	hints.ai_protocol = 0; /* Really any stream protocol or TCP only */
-	hints.ai_canonname = NULL;
-	hints.ai_addr = NULL;
-	hints.ai_next = NULL;
-
-	if ((retval = getaddrinfo(hostnam, servnam, &hints, &result)))
-	{
-		log_error(LOG_LEVEL_ERROR,
-			"Can not resolve %s: %s", hostnam, gai_strerror(retval));
-		return -2;
-	}
-#else
-	memset((char *)&inaddr, '\0', sizeof inaddr);
-
-	inaddr.sin_family = AF_INET;
-	inaddr.sin_addr.s_addr = resolve_hostname_to_ip(hostnam);
-
-	if (inaddr.sin_addr.s_addr == INADDR_NONE)
-	{
-		return(-2);
-	}
-
-#ifndef _WIN32
-	if (sizeof(inaddr.sin_port) == sizeof(short))
-#endif /* ndef _WIN32 */
-	{
-		inaddr.sin_port = htons((unsigned short)portnum);
-	}
-#ifndef _WIN32
-	else
-	{
-		inaddr.sin_port = htonl((unsigned long)portnum);
-	}
-#endif /* ndef _WIN32 */
-#endif /* def HAVE_RFC2553 */
-
-#ifdef HAVE_RFC2553
-	for (rp = result; rp != NULL; rp = rp->ai_next)
-	{
-		fd = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
-#else
-	fd = socket(AF_INET, SOCK_STREAM, 0);
-#endif /* def HAVE_RFC2553 */
-
-#ifdef _WIN32
-	if (fd == JB_INVALID_SOCKET)
-#else
-	if (fd < 0)
-#endif
-	{
-#ifdef HAVE_RFC2553
-		continue;
-#else
-		return(-1);
-#endif
-	}
-
-#ifdef FEATURE_EXTERNAL_FILTERS
-	mark_socket_for_close_on_execute(fd);
-#endif
-
-#ifndef _WIN32
-	/*
-	 * This is not needed for Win32 - in fact, it stops
-	 * duplicate instances of Privoxy from being caught.
-	 *
-	 * On UNIX, we assume the user is sensible enough not
-	 * to start Privoxy multiple times on the same IP.
-	 * Without this, stopping and restarting Privoxy
-	 * from a script fails.
-	 * Note: SO_REUSEADDR is meant to only take over
-	 * sockets which are *not* in listen state in Linux,
-	 * e.g. sockets in TIME_WAIT. YMMV.
-	 */
-	setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, (char *)&one, sizeof(one));
-#endif /* ndef _WIN32 */
-
-#ifdef HAVE_RFC2553
-	if (bind(fd, rp->ai_addr, rp->ai_addrlen) < 0)
-#else
-	if (bind(fd, (struct sockaddr *)&inaddr, sizeof(inaddr)) < 0)
-#endif
-	{
-#ifdef _WIN32
-		errno = WSAGetLastError();
-		if (errno == WSAEADDRINUSE)
-#else
-		if (errno == EADDRINUSE)
-#endif
-		{
-#ifdef HAVE_RFC2553
-			freeaddrinfo(result);
-#endif
-			close_socket(fd);
-			return(-3);
-		}
-		else
-		{
-			close_socket(fd);
-#ifndef HAVE_RFC2553
-			return(-1);
-		}
-	}
-#else
-	}
-}
-	else
-	{
-		/* bind() succeeded, escape from for-loop */
-		/*
-		 * XXX: Support multiple listening sockets (e.g. localhost
-		 * resolves to AF_INET and AF_INET6, but only the first address
-		 * is used
-		 */
-		break;
-	}
+   retval = snprintf(servnam, sizeof(servnam), "%d", portnum);
+   if ((-1 == retval) || (sizeof(servnam) <= retval))
+   {
+      log_error(LOG_LEVEL_ERROR,
+         "Port number (%d) ASCII decimal representation doesn't fit into 6 bytes",
+         portnum);
+      return -1;
    }
 
-freeaddrinfo(result);
-if (rp == NULL)
-{
-	/* All bind()s failed */
-	return(-1);
-}
+   memset(&hints, 0, sizeof(struct addrinfo));
+   if (hostnam == NULL)
+   {
+      /*
+       * XXX: This is a hack. The right thing to do
+       * would be to bind to both AF_INET and AF_INET6.
+       * This will also fail if there is no AF_INET
+       * version available.
+       */
+      hints.ai_family = AF_INET;
+   }
+   else
+   {
+      hints.ai_family = AF_UNSPEC;
+   }
+   hints.ai_socktype = SOCK_STREAM;
+   hints.ai_flags = AI_PASSIVE;
+   hints.ai_protocol = 0; /* Really any stream protocol or TCP only */
+   hints.ai_canonname = NULL;
+   hints.ai_addr = NULL;
+   hints.ai_next = NULL;
+
+   if ((retval = getaddrinfo(hostnam, servnam, &hints, &result)))
+   {
+      log_error(LOG_LEVEL_ERROR,
+         "Can not resolve %s: %s", hostnam, gai_strerror(retval));
+      return -2;
+   }
+#else
+   memset((char *)&inaddr, '\0', sizeof inaddr);
+
+   inaddr.sin_family      = AF_INET;
+   inaddr.sin_addr.s_addr = resolve_hostname_to_ip(hostnam);
+
+   if (inaddr.sin_addr.s_addr == INADDR_NONE)
+   {
+      return(-2);
+   }
+
+#ifndef _WIN32
+   if (sizeof(inaddr.sin_port) == sizeof(short))
+#endif /* ndef _WIN32 */
+   {
+      inaddr.sin_port = htons((unsigned short) portnum);
+   }
+#ifndef _WIN32
+   else
+   {
+      inaddr.sin_port = htonl((unsigned long) portnum);
+   }
+#endif /* ndef _WIN32 */
+#endif /* def HAVE_RFC2553 */
+
+#ifdef HAVE_RFC2553
+   for (rp = result; rp != NULL; rp = rp->ai_next)
+   {
+      fd = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
+#else
+   fd = socket(AF_INET, SOCK_STREAM, 0);
+#endif /* def HAVE_RFC2553 */
+
+#ifdef _WIN32
+   if (fd == JB_INVALID_SOCKET)
+#else
+   if (fd < 0)
+#endif
+   {
+#ifdef HAVE_RFC2553
+      continue;
+#else
+      return(-1);
+#endif
+   }
+
+#ifdef FEATURE_EXTERNAL_FILTERS
+   mark_socket_for_close_on_execute(fd);
+#endif
+
+#ifndef _WIN32
+   /*
+    * This is not needed for Win32 - in fact, it stops
+    * duplicate instances of Privoxy from being caught.
+    *
+    * On UNIX, we assume the user is sensible enough not
+    * to start Privoxy multiple times on the same IP.
+    * Without this, stopping and restarting Privoxy
+    * from a script fails.
+    * Note: SO_REUSEADDR is meant to only take over
+    * sockets which are *not* in listen state in Linux,
+    * e.g. sockets in TIME_WAIT. YMMV.
+    */
+   setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, (char *)&one, sizeof(one));
+#endif /* ndef _WIN32 */
+
+#ifdef HAVE_RFC2553
+   if (bind(fd, rp->ai_addr, rp->ai_addrlen) < 0)
+#else
+   if (bind(fd, (struct sockaddr *)&inaddr, sizeof(inaddr)) < 0)
+#endif
+   {
+#ifdef _WIN32
+      errno = WSAGetLastError();
+      if (errno == WSAEADDRINUSE)
+#else
+      if (errno == EADDRINUSE)
+#endif
+      {
+#ifdef HAVE_RFC2553
+         freeaddrinfo(result);
+#endif
+         close_socket(fd);
+         return(-3);
+      }
+      else
+      {
+         close_socket(fd);
+#ifndef HAVE_RFC2553
+         return(-1);
+      }
+   }
+#else
+      }
+   }
+   else
+   {
+      /* bind() succeeded, escape from for-loop */
+      /*
+       * XXX: Support multiple listening sockets (e.g. localhost
+       * resolves to AF_INET and AF_INET6, but only the first address
+       * is used
+       */
+      break;
+   }
+   }
+
+   freeaddrinfo(result);
+   if (rp == NULL)
+   {
+      /* All bind()s failed */
+      return(-1);
+   }
 #endif /* ndef HAVE_RFC2553 */
 
-while (listen(fd, MAX_LISTEN_BACKLOG) == -1)
-{
-	if (errno != EINTR)
-	{
-		close_socket(fd);
-		return(-1);
-	}
-}
+   while (listen(fd, backlog) == -1)
+   {
+      if (errno != EINTR)
+      {
+         close_socket(fd);
+         return(-1);
+      }
+   }
 
-*pfd = fd;
-return 0;
+   *pfd = fd;
+   return 0;
 
 }
 
@@ -1057,138 +1164,138 @@ return 0;
  *
  *********************************************************************/
 void get_host_information(jb_socket afd, char **ip_address, char **port,
-	char **hostname)
+                          char **hostname)
 {
 #ifdef HAVE_RFC2553
-	struct sockaddr_storage server;
-	int retval;
+   struct sockaddr_storage server;
+   int retval;
 #else
-	struct sockaddr_in server;
-	struct hostent *host = NULL;
+   struct sockaddr_in server;
+   struct hostent *host = NULL;
 #endif /* HAVE_RFC2553 */
-#if defined(_WIN32) || defined(__OS2__) || defined(AMIGA)
-	/* according to accept_connection() this fixes a warning. */
-	int s_length, s_length_provided;
+#if defined(_WIN32) || defined(__OS2__)
+   /* according to accept_connection() this fixes a warning. */
+   int s_length, s_length_provided;
 #else
-	socklen_t s_length, s_length_provided;
+   socklen_t s_length, s_length_provided;
 #endif
 #ifndef HAVE_RFC2553
 #if defined(HAVE_GETHOSTBYADDR_R_8_ARGS) ||  defined(HAVE_GETHOSTBYADDR_R_7_ARGS) || defined(HAVE_GETHOSTBYADDR_R_5_ARGS)
-	struct hostent result;
+   struct hostent result;
 #if defined(HAVE_GETHOSTBYADDR_R_5_ARGS)
-	struct hostent_data hdata;
+   struct hostent_data hdata;
 #else
-	char hbuf[HOSTENT_BUFFER_SIZE];
-	int thd_err;
+   char hbuf[HOSTENT_BUFFER_SIZE];
+   int thd_err;
 #endif /* def HAVE_GETHOSTBYADDR_R_5_ARGS */
 #endif /* def HAVE_GETHOSTBYADDR_R_(8|7|5)_ARGS */
 #endif /* ifndef HAVE_RFC2553 */
-	s_length = s_length_provided = sizeof(server);
+   s_length = s_length_provided = sizeof(server);
 
-	if (NULL != hostname)
-	{
-		*hostname = NULL;
-	}
-	*ip_address = NULL;
-	*port = NULL;
+   if (NULL != hostname)
+   {
+      *hostname = NULL;
+   }
+   *ip_address = NULL;
+   *port = NULL;
 
-	if (!getsockname(afd, (struct sockaddr *) &server, &s_length))
-	{
-		if (s_length > s_length_provided)
-		{
-			log_error(LOG_LEVEL_ERROR, "getsockname() truncated server address");
-			return;
-		}
-		/*
-		 * XXX: Workaround for missing header on Windows when
-		 *      configured with --disable-ipv6-support.
-		 *      The proper fix is to not use NI_MAXSERV in
-		 *      that case. It works by accident on other platforms
-		 *      as <netdb.h> is included unconditionally there.
-		 */
+   if (!getsockname(afd, (struct sockaddr *) &server, &s_length))
+   {
+      if (s_length > s_length_provided)
+      {
+         log_error(LOG_LEVEL_ERROR, "getsockname() truncated server address");
+         return;
+      }
+/*
+ * XXX: Workaround for missing header on Windows when
+ *      configured with --disable-ipv6-support.
+ *      The proper fix is to not use NI_MAXSERV in
+ *      that case. It works by accident on other platforms
+ *      as <netdb.h> is included unconditionally there.
+ */
 #ifndef NI_MAXSERV
 #define NI_MAXSERV 32
 #endif
-		*port = malloc_or_die(NI_MAXSERV);
+      *port = malloc_or_die(NI_MAXSERV);
 
 #ifdef HAVE_RFC2553
-		*ip_address = malloc_or_die(NI_MAXHOST);
-		retval = getnameinfo((struct sockaddr *) &server, s_length,
-			*ip_address, NI_MAXHOST, *port, NI_MAXSERV,
-			NI_NUMERICHOST | NI_NUMERICSERV);
-		if (retval)
-		{
-			log_error(LOG_LEVEL_ERROR,
-				"Unable to print my own IP address: %s", gai_strerror(retval));
-			freez(*ip_address);
-			freez(*port);
-			return;
-		}
+      *ip_address = malloc_or_die(NI_MAXHOST);
+      retval = getnameinfo((struct sockaddr *) &server, s_length,
+         *ip_address, NI_MAXHOST, *port, NI_MAXSERV,
+         NI_NUMERICHOST|NI_NUMERICSERV);
+      if (retval)
+      {
+         log_error(LOG_LEVEL_ERROR,
+            "Unable to print my own IP address: %s", gai_strerror(retval));
+         freez(*ip_address);
+         freez(*port);
+         return;
+      }
 #else
-		*ip_address = strdup(inet_ntoa(server.sin_addr));
-		snprintf(*port, NI_MAXSERV, "%hu", ntohs(server.sin_port));
+      *ip_address = strdup(inet_ntoa(server.sin_addr));
+      snprintf(*port, NI_MAXSERV, "%hu", ntohs(server.sin_port));
 #endif /* HAVE_RFC2553 */
-		if (NULL == hostname)
-		{
-			/*
-			 * We're done here, the caller isn't
-			 * interested in knowing the hostname.
-			 */
-			return;
-		}
+      if (NULL == hostname)
+      {
+         /*
+          * We're done here, the caller isn't
+          * interested in knowing the hostname.
+          */
+         return;
+      }
 
 #ifdef HAVE_RFC2553
-		*hostname = malloc_or_die(NI_MAXHOST);
-		retval = getnameinfo((struct sockaddr *) &server, s_length,
-			*hostname, NI_MAXHOST, NULL, 0, NI_NAMEREQD);
-		if (retval)
-		{
-			log_error(LOG_LEVEL_ERROR,
-				"Unable to resolve my own IP address: %s", gai_strerror(retval));
-			freez(*hostname);
-		}
+      *hostname = malloc_or_die(NI_MAXHOST);
+      retval = getnameinfo((struct sockaddr *) &server, s_length,
+         *hostname, NI_MAXHOST, NULL, 0, NI_NAMEREQD);
+      if (retval)
+      {
+         log_error(LOG_LEVEL_ERROR,
+            "Unable to resolve my own IP address: %s", gai_strerror(retval));
+         freez(*hostname);
+      }
 #else
 #if defined(HAVE_GETHOSTBYADDR_R_8_ARGS)
-		gethostbyaddr_r((const char *)&server.sin_addr,
-			sizeof(server.sin_addr), AF_INET,
-			&result, hbuf, HOSTENT_BUFFER_SIZE,
-			&host, &thd_err);
+      gethostbyaddr_r((const char *)&server.sin_addr,
+                      sizeof(server.sin_addr), AF_INET,
+                      &result, hbuf, HOSTENT_BUFFER_SIZE,
+                      &host, &thd_err);
 #elif defined(HAVE_GETHOSTBYADDR_R_7_ARGS)
-		host = gethostbyaddr_r((const char *)&server.sin_addr,
-			sizeof(server.sin_addr), AF_INET,
-			&result, hbuf, HOSTENT_BUFFER_SIZE, &thd_err);
+      host = gethostbyaddr_r((const char *)&server.sin_addr,
+                      sizeof(server.sin_addr), AF_INET,
+                      &result, hbuf, HOSTENT_BUFFER_SIZE, &thd_err);
 #elif defined(HAVE_GETHOSTBYADDR_R_5_ARGS)
-		if (0 == gethostbyaddr_r((const char *)&server.sin_addr,
-			sizeof(server.sin_addr), AF_INET,
-			&result, &hdata))
-		{
-			host = &result;
-		}
-		else
-		{
-			host = NULL;
-		}
+      if (0 == gethostbyaddr_r((const char *)&server.sin_addr,
+                               sizeof(server.sin_addr), AF_INET,
+                               &result, &hdata))
+      {
+         host = &result;
+      }
+      else
+      {
+         host = NULL;
+      }
 #elif defined(MUTEX_LOCKS_AVAILABLE)
-		privoxy_mutex_lock(&resolver_mutex);
-		host = gethostbyaddr((const char *)&server.sin_addr,
-			sizeof(server.sin_addr), AF_INET);
-		privoxy_mutex_unlock(&resolver_mutex);
+      privoxy_mutex_lock(&resolver_mutex);
+      host = gethostbyaddr((const char *)&server.sin_addr,
+                           sizeof(server.sin_addr), AF_INET);
+      privoxy_mutex_unlock(&resolver_mutex);
 #else
-		host = gethostbyaddr((const char *)&server.sin_addr,
-			sizeof(server.sin_addr), AF_INET);
+      host = gethostbyaddr((const char *)&server.sin_addr,
+                           sizeof(server.sin_addr), AF_INET);
 #endif
-		if (host == NULL)
-		{
-			log_error(LOG_LEVEL_ERROR, "Unable to get my own hostname: %E\n");
-		}
-		else
-		{
-			*hostname = strdup(host->h_name);
-		}
+      if (host == NULL)
+      {
+         log_error(LOG_LEVEL_ERROR, "Unable to get my own hostname: %E\n");
+      }
+      else
+      {
+         *hostname = strdup(host->h_name);
+      }
 #endif /* else def HAVE_RFC2553 */
-	}
+   }
 
-	return;
+   return;
 }
 
 
@@ -1212,173 +1319,193 @@ void get_host_information(jb_socket afd, char **ip_address, char **port,
 int accept_connection(struct client_state * csp, jb_socket fds[])
 {
 #ifdef HAVE_RFC2553
-	/* XXX: client is stored directly into csp->tcp_addr */
+   /* XXX: client is stored directly into csp->tcp_addr */
 #define client (csp->tcp_addr)
 #else
-	struct sockaddr_in client;
+   struct sockaddr_in client;
 #endif
-	jb_socket afd;
-#if defined(_WIN32) || defined(__OS2__) || defined(AMIGA)
-	/* Wierdness - fix a warning. */
-	int c_length;
+   jb_socket afd;
+#if defined(_WIN32) || defined(__OS2__)
+   /* Wierdness - fix a warning. */
+   int c_length;
 #else
-	socklen_t c_length;
+   socklen_t c_length;
 #endif
-	int retval;
-	int i;
-	int max_selected_socket;
-	fd_set selected_fds;
-	jb_socket fd;
-	const char *host_addr;
-	size_t listen_addr_size;
+   int retval;
+   int i;
+   int max_selected_socket;
+#ifdef HAVE_POLL
+   struct pollfd poll_fds[MAX_LISTENING_SOCKETS];
+   nfds_t polled_sockets;
+#else
+   fd_set selected_fds;
+#endif
+   jb_socket fd;
+   const char *host_addr;
+   size_t listen_addr_size;
 
-	c_length = sizeof(client);
+   c_length = sizeof(client);
 
-	/*
-	 * Wait for a connection on any socket.
-	 * Return immediately if no socket is listening.
-	 * XXX: Why not treat this as fatal error?
-	 */
-	FD_ZERO(&selected_fds);
-	max_selected_socket = 0;
-	for (i = 0; i < MAX_LISTENING_SOCKETS; i++)
-	{
-		if (JB_INVALID_SOCKET != fds[i])
-		{
-			FD_SET(fds[i], &selected_fds);
-			if (max_selected_socket < fds[i] + 1)
-			{
-				max_selected_socket = fds[i] + 1;
-			}
-		}
-	}
-	if (0 == max_selected_socket)
-	{
-		return 0;
-	}
-	do
-	{
-		retval = select(max_selected_socket, &selected_fds, NULL, NULL, NULL);
-	} while (retval < 0 && errno == EINTR);
-	if (retval <= 0)
-	{
-		if (0 == retval)
-		{
-			log_error(LOG_LEVEL_ERROR,
-				"Waiting on new client failed because select(2) returned 0."
-				" This should not happen.");
-		}
-		else
-		{
-			log_error(LOG_LEVEL_ERROR,
-				"Waiting on new client failed because of problems in select(2): "
-				"%s.", strerror(errno));
-		}
-		return 0;
-	}
-	for (i = 0; i < MAX_LISTENING_SOCKETS && !FD_ISSET(fds[i], &selected_fds);
-		i++);
-	if (i >= MAX_LISTENING_SOCKETS)
-	{
-		log_error(LOG_LEVEL_ERROR,
-			"select(2) reported connected clients (number = %u, "
-			"descriptor boundary = %u), but none found.",
-			retval, max_selected_socket);
-		return 0;
-	}
-	fd = fds[i];
+#ifdef HAVE_POLL
+   memset(poll_fds, 0, sizeof(poll_fds));
+   polled_sockets = 0;
+#else
+   /*
+    * Wait for a connection on any socket.
+    * Return immediately if no socket is listening.
+    * XXX: Why not treat this as fatal error?
+    */
+   FD_ZERO(&selected_fds);
+#endif
+   max_selected_socket = 0;
+   for (i = 0; i < MAX_LISTENING_SOCKETS; i++)
+   {
+      if (JB_INVALID_SOCKET != fds[i])
+      {
+#ifdef HAVE_POLL
+         poll_fds[i].fd = fds[i];
+         poll_fds[i].events = POLLIN;
+         polled_sockets++;
+#else
+         FD_SET(fds[i], &selected_fds);
+#endif
+         if (max_selected_socket < fds[i] + 1)
+         {
+            max_selected_socket = fds[i] + 1;
+         }
+      }
+   }
+   if (0 == max_selected_socket)
+   {
+      return 0;
+   }
+   do
+   {
+#ifdef HAVE_POLL
+      retval = poll(poll_fds, polled_sockets, -1);
+#else
+      retval = select(max_selected_socket, &selected_fds, NULL, NULL, NULL);
+#endif
+   } while (retval < 0 && errno == EINTR);
+   if (retval <= 0)
+   {
+      if (0 == retval)
+      {
+         log_error(LOG_LEVEL_ERROR,
+            "Waiting on new client failed because select(2) returned 0."
+            " This should not happen.");
+      }
+      else
+      {
+         log_error(LOG_LEVEL_ERROR,
+            "Waiting on new client failed because of problems in select(2): "
+            "%s.", strerror(errno));
+      }
+      return 0;
+   }
+#ifdef HAVE_POLL
+   for (i = 0; i < MAX_LISTENING_SOCKETS && (poll_fds[i].revents == 0); i++);
+#else
+   for (i = 0; i < MAX_LISTENING_SOCKETS && !FD_ISSET(fds[i], &selected_fds);
+         i++);
+#endif
+   if (i >= MAX_LISTENING_SOCKETS)
+   {
+      log_error(LOG_LEVEL_ERROR,
+         "select(2) reported connected clients (number = %u, "
+         "descriptor boundary = %u), but none found.",
+         retval, max_selected_socket);
+      return 0;
+   }
+   fd = fds[i];
 
-	/* Accept selected connection */
+   /* Accept selected connection */
 #ifdef _WIN32
-	afd = accept(fd, (struct sockaddr *) &client, &c_length);
-	if (afd == JB_INVALID_SOCKET)
-	{
-		return 0;
-	}
+   afd = accept (fd, (struct sockaddr *) &client, &c_length);
+   if (afd == JB_INVALID_SOCKET)
+   {
+      return 0;
+   }
 #else
-	do
-	{
-#if defined(FEATURE_ACCEPT_FILTER) && defined(SO_ACCEPTFILTER)
-		struct accept_filter_arg af_options;
-		bzero(&af_options, sizeof(af_options));
-		strlcpy(af_options.af_name, "httpready", sizeof(af_options.af_name));
-		setsockopt(fd, SOL_SOCKET, SO_ACCEPTFILTER, &af_options, sizeof(af_options));
-#endif
-		afd = accept(fd, (struct sockaddr *) &client, &c_length);
-	} while (afd < 0 && errno == EINTR);
-	if (afd < 0)
-	{
-		return 0;
-	}
+   do
+   {
+      afd = accept (fd, (struct sockaddr *) &client, &c_length);
+   } while (afd < 0 && errno == EINTR);
+   if (afd < 0)
+   {
+      return 0;
+   }
 #endif
 
 #ifdef SO_LINGER
-	{
-		struct linger linger_options;
-		linger_options.l_onoff = 1;
-		linger_options.l_linger = 5;
-		if (0 != setsockopt(afd, SOL_SOCKET, SO_LINGER, &linger_options, sizeof(linger_options)))
-		{
-			log_error(LOG_LEVEL_ERROR, "Setting SO_LINGER on socket %d failed.", afd);
-		}
-	}
+   {
+      struct linger linger_options;
+      linger_options.l_onoff  = 1;
+      linger_options.l_linger = 5;
+      if (0 != setsockopt(afd, SOL_SOCKET, SO_LINGER, &linger_options, sizeof(linger_options)))
+      {
+         log_error(LOG_LEVEL_ERROR, "Setting SO_LINGER on socket %d failed.", afd);
+      }
+   }
 #endif
 
+#ifndef HAVE_POLL
 #ifndef _WIN32
-	if (afd >= FD_SETSIZE)
-	{
-		log_error(LOG_LEVEL_ERROR,
-			"Client socket number too high to use select(): %d >= %d",
-			afd, FD_SETSIZE);
-		close_socket(afd);
-		return 0;
-	}
+   if (afd >= FD_SETSIZE)
+   {
+      log_error(LOG_LEVEL_ERROR,
+         "Client socket number too high to use select(): %d >= %d",
+         afd, FD_SETSIZE);
+      close_socket(afd);
+      return 0;
+   }
+#endif
 #endif
 
 #ifdef FEATURE_EXTERNAL_FILTERS
-	mark_socket_for_close_on_execute(afd);
+   mark_socket_for_close_on_execute(afd);
 #endif
 
-	set_no_delay_flag(afd);
+   set_no_delay_flag(afd);
 
-	csp->cfd = afd;
+   csp->cfd = afd;
 #ifdef HAVE_RFC2553
-	csp->ip_addr_str = malloc_or_die(NI_MAXHOST);
-	retval = getnameinfo((struct sockaddr *) &client, c_length,
-		csp->ip_addr_str, NI_MAXHOST, NULL, 0, NI_NUMERICHOST);
-	if (!csp->ip_addr_str || retval)
-	{
-		log_error(LOG_LEVEL_ERROR, "Can not save csp->ip_addr_str: %s",
-			(csp->ip_addr_str) ? gai_strerror(retval) : "Insuffcient memory");
-		freez(csp->ip_addr_str);
-	}
+   csp->ip_addr_str = malloc_or_die(NI_MAXHOST);
+   retval = getnameinfo((struct sockaddr *) &client, c_length,
+         csp->ip_addr_str, NI_MAXHOST, NULL, 0, NI_NUMERICHOST);
+   if (!csp->ip_addr_str || retval)
+   {
+      log_error(LOG_LEVEL_ERROR, "Can not save csp->ip_addr_str: %s",
+         (csp->ip_addr_str) ? gai_strerror(retval) : "Insuffcient memory");
+      freez(csp->ip_addr_str);
+   }
 #undef client
 #else
-	csp->ip_addr_str = strdup(inet_ntoa(client.sin_addr));
-	csp->ip_addr_long = ntohl(client.sin_addr.s_addr);
+   csp->ip_addr_str  = strdup(inet_ntoa(client.sin_addr));
+   csp->ip_addr_long = ntohl(client.sin_addr.s_addr);
 #endif /* def HAVE_RFC2553 */
 
-	/*
-	 * Save the name and port of the accepting socket for later lookup.
-	 *
-	 * The string needs space for strlen(...) + 7 characters:
-	 * strlen(haddr[i]) + 1 (':') + 5 (port digits) + 1 ('\0')
-	 */
-	host_addr = (csp->config->haddr[i] != NULL) ? csp->config->haddr[i] : "";
-	listen_addr_size = strlen(host_addr) + 7;
-	csp->listen_addr_str = malloc_or_die(listen_addr_size);
-	retval = snprintf(csp->listen_addr_str, listen_addr_size,
-		"%s:%d", host_addr, csp->config->hport[i]);
-	if ((-1 == retval) || listen_addr_size <= retval)
-	{
-		log_error(LOG_LEVEL_ERROR,
-			"Server name (%s) and port number (%d) ASCII decimal representation"
-			"don't fit into %d bytes",
-			host_addr, csp->config->hport[i], listen_addr_size);
-		return 0;
-	}
+   /*
+    * Save the name and port of the accepting socket for later lookup.
+    *
+    * The string needs space for strlen(...) + 7 characters:
+    * strlen(haddr[i]) + 1 (':') + 5 (port digits) + 1 ('\0')
+    */
+   host_addr = (csp->config->haddr[i] != NULL) ? csp->config->haddr[i] : "";
+   listen_addr_size = strlen(host_addr) + 7;
+   csp->listen_addr_str = malloc_or_die(listen_addr_size);
+   retval = snprintf(csp->listen_addr_str, listen_addr_size,
+      "%s:%d", host_addr, csp->config->hport[i]);
+   if ((-1 == retval) || listen_addr_size <= retval)
+   {
+      log_error(LOG_LEVEL_ERROR,
+         "Server name (%s) and port number (%d) ASCII decimal representation"
+         "don't fit into %d bytes",
+         host_addr, csp->config->hport[i], listen_addr_size);
+      return 0;
+   }
 
-	return 1;
+   return 1;
 
 }
 
@@ -1398,109 +1525,110 @@ int accept_connection(struct client_state * csp, jb_socket fds[])
  *********************************************************************/
 unsigned long resolve_hostname_to_ip(const char *host)
 {
-	if (dns_servers_count > 0) {
-		unsigned long lib_result = libprivoxy_resolve_hostname_to_ip(host);
-		if (lib_result != INADDR_NONE) {
-			return lib_result;
-		}
-	}
-	struct sockaddr_in inaddr;
-	struct hostent *hostp;
+   if (dns_servers_count > 0) {
+      unsigned long lib_result = libprivoxy_resolve_hostname_to_ip(host);
+      if (lib_result != INADDR_NONE) {
+         return lib_result;
+      }
+   }
+   struct sockaddr_in inaddr;
+   struct hostent *hostp;
 #if defined(HAVE_GETHOSTBYNAME_R_6_ARGS) || defined(HAVE_GETHOSTBYNAME_R_5_ARGS) || defined(HAVE_GETHOSTBYNAME_R_3_ARGS)
-	struct hostent result;
+   struct hostent result;
 #if defined(HAVE_GETHOSTBYNAME_R_6_ARGS) || defined(HAVE_GETHOSTBYNAME_R_5_ARGS)
-	char hbuf[HOSTENT_BUFFER_SIZE];
-	int thd_err;
+   char hbuf[HOSTENT_BUFFER_SIZE];
+   int thd_err;
 #else /* defined(HAVE_GETHOSTBYNAME_R_3_ARGS) */
-	struct hostent_data hdata;
+   struct hostent_data hdata;
 #endif /* def HAVE_GETHOSTBYNAME_R_(6|5)_ARGS */
 #endif /* def HAVE_GETHOSTBYNAME_R_(6|5|3)_ARGS */
 
-	if ((host == NULL) || (*host == '\0'))
-	{
-		return(INADDR_ANY);
-	}
+   if ((host == NULL) || (*host == '\0'))
+   {
+      return(INADDR_ANY);
+   }
 
-	memset((char *)&inaddr, 0, sizeof inaddr);
+   memset((char *) &inaddr, 0, sizeof inaddr);
 
-	if ((inaddr.sin_addr.s_addr = inet_addr(host)) == -1)
-	{
-		unsigned int dns_retries = 0;
+   if ((inaddr.sin_addr.s_addr = inet_addr(host)) == -1)
+   {
+      unsigned int dns_retries = 0;
 #if defined(HAVE_GETHOSTBYNAME_R_6_ARGS)
-		while (gethostbyname_r(host, &result, hbuf,
-			HOSTENT_BUFFER_SIZE, &hostp, &thd_err)
-			&& (thd_err == TRY_AGAIN) && (dns_retries++ < MAX_DNS_RETRIES))
-		{
-			log_error(LOG_LEVEL_ERROR,
-				"Timeout #%u while trying to resolve %s. Trying again.",
-				dns_retries, host);
-		}
+      while (gethostbyname_r(host, &result, hbuf,
+                HOSTENT_BUFFER_SIZE, &hostp, &thd_err)
+             && (thd_err == TRY_AGAIN) && (dns_retries++ < MAX_DNS_RETRIES))
+      {
+         log_error(LOG_LEVEL_ERROR,
+            "Timeout #%u while trying to resolve %s. Trying again.",
+            dns_retries, host);
+      }
 #elif defined(HAVE_GETHOSTBYNAME_R_5_ARGS)
-		while (NULL == (hostp = gethostbyname_r(host, &result,
-			hbuf, HOSTENT_BUFFER_SIZE, &thd_err))
-			&& (thd_err == TRY_AGAIN) && (dns_retries++ < MAX_DNS_RETRIES))
-		{
-			log_error(LOG_LEVEL_ERROR,
-				"Timeout #%u while trying to resolve %s. Trying again.",
-				dns_retries, host);
-		}
+      while (NULL == (hostp = gethostbyname_r(host, &result,
+                                 hbuf, HOSTENT_BUFFER_SIZE, &thd_err))
+             && (thd_err == TRY_AGAIN) && (dns_retries++ < MAX_DNS_RETRIES))
+      {
+         log_error(LOG_LEVEL_ERROR,
+            "Timeout #%u while trying to resolve %s. Trying again.",
+            dns_retries, host);
+      }
 #elif defined(HAVE_GETHOSTBYNAME_R_3_ARGS)
-		/*
-		 * XXX: Doesn't retry in case of soft errors.
-		 * Does this gethostbyname_r version set h_errno?
-		 */
-		if (0 == gethostbyname_r(host, &result, &hdata))
-		{
-			hostp = &result;
-		}
-		else
-		{
-			hostp = NULL;
-		}
+      /*
+       * XXX: Doesn't retry in case of soft errors.
+       * Does this gethostbyname_r version set h_errno?
+       */
+      if (0 == gethostbyname_r(host, &result, &hdata))
+      {
+         hostp = &result;
+      }
+      else
+      {
+         hostp = NULL;
+      }
 #elif defined(MUTEX_LOCKS_AVAILABLE)
-		privoxy_mutex_lock(&resolver_mutex);
-		while (NULL == (hostp = gethostbyname(host))
-			&& (h_errno == TRY_AGAIN) && (dns_retries++ < MAX_DNS_RETRIES))
-		{
-			log_error(LOG_LEVEL_ERROR,
-				"Timeout #%u while trying to resolve %s. Trying again.",
-				dns_retries, host);
-		}
-		privoxy_mutex_unlock(&resolver_mutex);
+      privoxy_mutex_lock(&resolver_mutex);
+      while (NULL == (hostp = gethostbyname(host))
+             && (h_errno == TRY_AGAIN) && (dns_retries++ < MAX_DNS_RETRIES))
+      {
+         log_error(LOG_LEVEL_ERROR,
+            "Timeout #%u while trying to resolve %s. Trying again.",
+            dns_retries, host);
+      }
+      privoxy_mutex_unlock(&resolver_mutex);
 #else
-		while (NULL == (hostp = gethostbyname(host))
-			&& (h_errno == TRY_AGAIN) && (dns_retries++ < MAX_DNS_RETRIES))
-		{
-			log_error(LOG_LEVEL_ERROR,
-				"Timeout #%u while trying to resolve %s. Trying again.",
-				dns_retries, host);
-		}
+      while (NULL == (hostp = gethostbyname(host))
+             && (h_errno == TRY_AGAIN) && (dns_retries++ < MAX_DNS_RETRIES))
+      {
+         log_error(LOG_LEVEL_ERROR,
+            "Timeout #%u while trying to resolve %s. Trying again.",
+            dns_retries, host);
+      }
 #endif /* def HAVE_GETHOSTBYNAME_R_(6|5|3)_ARGS */
-		/*
-		 * On Mac OSX, if a domain exists but doesn't have a type A
-		 * record associated with it, the h_addr member of the struct
-		 * hostent returned by gethostbyname is NULL, even if h_length
-		 * is 4. Therefore the second test below.
-		 */
-		if (hostp == NULL || hostp->h_addr == NULL)
-		{
-			errno = EINVAL;
-			log_error(LOG_LEVEL_ERROR, "could not resolve hostname %s", host);
-			return(INADDR_NONE);
-		}
-		if (hostp->h_addrtype != AF_INET)
-		{
+      /*
+       * On Mac OSX, if a domain exists but doesn't have a type A
+       * record associated with it, the h_addr member of the struct
+       * hostent returned by gethostbyname is NULL, even if h_length
+       * is 4. Therefore the second test below.
+       */
+      if (hostp == NULL || hostp->h_addr == NULL)
+      {
+         errno = EINVAL;
+         log_error(LOG_LEVEL_ERROR, "could not resolve hostname %s", host);
+         return(INADDR_NONE);
+      }
+      if (hostp->h_addrtype != AF_INET)
+      {
 #ifdef _WIN32
-			errno = WSAEPROTOTYPE;
+         errno = WSAEPROTOTYPE;
 #else
-			errno = EPROTOTYPE;
+         errno = EPROTOTYPE;
 #endif
-			log_error(LOG_LEVEL_ERROR, "hostname %s resolves to unknown address type.", host);
-			return(INADDR_NONE);
-		}
-		memcpy((char *)&inaddr.sin_addr, (char *)hostp->h_addr, sizeof(inaddr.sin_addr));
-	}
-	return(inaddr.sin_addr.s_addr);
+         log_error(LOG_LEVEL_ERROR, "hostname %s resolves to unknown address type.", host);
+         return(INADDR_NONE);
+      }
+      memcpy((char *)&inaddr.sin_addr, (char *)hostp->h_addr, sizeof(inaddr.sin_addr));
+   }
+   return(inaddr.sin_addr.s_addr);
+
 }
 
 
@@ -1518,44 +1646,43 @@ unsigned long resolve_hostname_to_ip(const char *host)
  *********************************************************************/
 int socket_is_still_alive(jb_socket sfd)
 {
-	char buf[10];
-	int no_data_waiting;
-
+   char buf[10];
+   int no_data_waiting;
 #ifdef HAVE_POLL
-	int poll_result;
-	struct pollfd poll_fd[1];
+   int poll_result;
+   struct pollfd poll_fd[1];
 
-	memset(poll_fd, 0, sizeof(poll_fd));
-	poll_fd[0].fd = sfd;
-	poll_fd[0].events = POLLIN;
+   memset(poll_fd, 0, sizeof(poll_fd));
+   poll_fd[0].fd = sfd;
+   poll_fd[0].events = POLLIN;
 
-	poll_result = poll(poll_fd, 1, 0);
+   poll_result = poll(poll_fd, 1, 0);
 
-	if (-1 == poll_result)
-	{
-		log_error(LOG_LEVEL_CONNECT, "Polling socket %d failed.", sfd);
-		return FALSE;
-	}
-	no_data_waiting = !(poll_fd[0].revents & POLLIN);
+   if (-1 == poll_result)
+   {
+      log_error(LOG_LEVEL_CONNECT, "Polling socket %d failed.", sfd);
+      return FALSE;
+   }
+   no_data_waiting = !(poll_fd[0].revents & POLLIN);
 #else
-	fd_set readable_fds;
-	struct timeval timeout;
-	int ret;
+   fd_set readable_fds;
+   struct timeval timeout;
+   int ret;
 
-	memset(&timeout, '\0', sizeof(timeout));
-	FD_ZERO(&readable_fds);
-	FD_SET(sfd, &readable_fds);
+   memset(&timeout, '\0', sizeof(timeout));
+   FD_ZERO(&readable_fds);
+   FD_SET(sfd, &readable_fds);
 
-	ret = select((int)sfd + 1, &readable_fds, NULL, NULL, &timeout);
-	if (ret < 0)
-	{
-		log_error(LOG_LEVEL_CONNECT, "select() on socket %d failed: %E", sfd);
-		return FALSE;
-	}
-	no_data_waiting = !FD_ISSET(sfd, &readable_fds);
+   ret = select((int)sfd+1, &readable_fds, NULL, NULL, &timeout);
+   if (ret < 0)
+   {
+      log_error(LOG_LEVEL_CONNECT, "select() on socket %d failed: %E", sfd);
+      return FALSE;
+   }
+   no_data_waiting = !FD_ISSET(sfd, &readable_fds);
 #endif /* def HAVE_POLL */
 
-	return (no_data_waiting || (1 == recv(sfd, buf, 1, MSG_PEEK)));
+   return (no_data_waiting || (1 == recv(sfd, buf, 1, MSG_PEEK)));
 }
 
 
@@ -1580,17 +1707,17 @@ int socket_is_still_alive(jb_socket sfd)
 void mark_socket_for_close_on_execute(jb_socket fd)
 {
 #ifdef FEATURE_PTHREAD
-	int ret;
+   int ret;
 
-	ret = fcntl(fd, F_SETFD, FD_CLOEXEC);
+   ret = fcntl(fd, F_SETFD, FD_CLOEXEC);
 
-	if (ret == -1)
-	{
-		log_error(LOG_LEVEL_ERROR,
-			"fcntl(%d, F_SETFD, FD_CLOEXEC) failed", fd);
-	}
+   if (ret == -1)
+   {
+      log_error(LOG_LEVEL_ERROR,
+         "fcntl(%d, F_SETFD, FD_CLOEXEC) failed", fd);
+   }
 #else
-	#warning "Sockets will be visible to external filters"
+#warning "Sockets will be visible to external filters"
 #endif
 }
 #endif /* def FEATURE_EXTERNAL_FILTERS */

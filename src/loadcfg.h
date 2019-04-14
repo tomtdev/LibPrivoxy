@@ -1,6 +1,5 @@
 #ifndef LOADCFG_H_INCLUDED
 #define LOADCFG_H_INCLUDED
-#define LOADCFG_H_VERSION "$Id: loadcfg.h,v 1.17 2013/11/24 14:23:28 fabiankeil Exp $"
 /*********************************************************************
  *
  * File        :  $Source: /cvsroot/ijbswa/current/loadcfg.h,v $
@@ -10,7 +9,7 @@
  *                routine to load the configuration and the global
  *                variables it writes to.
  *
- * Copyright   :  Written by and Copyright (C) 2001 the SourceForge
+ * Copyright   :  Written by and Copyright (C) 2001 members of the
  *                Privoxy team. http://www.privoxy.org/
  *
  *                Based on the Internet Junkbuster originally written
@@ -66,10 +65,6 @@ extern struct configuration_spec * load_config(void);
 #ifdef FEATURE_GRACEFUL_TERMINATION
 void unload_current_config_file(void);
 #endif
-
-/* Revision control strings from this header and associated .c file */
-extern const char loadcfg_rcs[];
-extern const char loadcfg_h_rcs[];
 
 #endif /* ndef LOADCFG_H_INCLUDED */
 

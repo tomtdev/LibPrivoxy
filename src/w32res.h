@@ -1,6 +1,5 @@
 #ifndef W32RES_H_INCLUDED
 #define W32RES_H_INCLUDED
-#define W32RES_H_VERSION "$Id: w32res.h,v 1.20 2011/09/04 11:10:56 fabiankeil Exp $"
 /*********************************************************************
  *
  * File        :  $Source: /cvsroot/ijbswa/current/w32res.h,v $

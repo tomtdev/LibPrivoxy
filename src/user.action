@@ -1,11 +1,9 @@
 ######################################################################
 # 
-#  File        :  $Source: /cvsroot/ijbswa/current/user.action,v $
+#  File        :  user.action
 # 
-#  $Id: user.action,v 1.13 2011/11/06 11:36:01 fabiankeil Exp $
-#
 #  Purpose     :  User-maintained actions file, see
-#                 http://www.privoxy.org/user-manual/actions-file.html
+#                 https://www.privoxy.org/user-manual/actions-file.html
 #
 ######################################################################
 
@@ -14,7 +12,7 @@
 # safe from updates to default.action.) Later defined actions always
 # take precedence, so anything defined here should have the last word.
 
-# See http://www.privoxy.org/user-manual/actions-file.html, or the 
+# See https://www.privoxy.org/user-manual/actions-file.html, or the
 # comments in default.action, for an explanation of what an "action" is
 # and what each action does.
 

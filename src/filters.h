@@ -1,16 +1,10 @@
 #ifndef FILTERS_H_INCLUDED
 #define FILTERS_H_INCLUDED
-#define FILTERS_H_VERSION "$Id: filters.h,v 1.47 2016/03/17 10:40:53 fabiankeil Exp $"
 /*********************************************************************
  *
  * File        :  $Source: /cvsroot/ijbswa/current/filters.h,v $
  *
  * Purpose     :  Declares functions to parse/crunch headers and pages.
- *                Functions declared include:
- *                   `acl_addr', `add_stats', `block_acl', `block_imageurl',
- *                   `block_url', `url_actions', `filter_popups', `forward_url'
- *                   `ij_untrusted_url', `intercept_url', `re_process_buffer',
- *                   `show_proxy_args', and `trust_url'
  *
  * Copyright   :  Written by and Copyright (C) 2001-2010 the
  *                Privoxy team. http://www.privoxy.org/
@@ -83,9 +77,8 @@ extern struct re_filterfile_spec *get_filter(const struct client_state *csp,
 /*
  * Determining parent proxies
  */
-extern int forward_url(struct client_state *csp,
-                       const struct http_request *http,
-                       struct forward_spec const *fwds[MAX_FORWARD_URLS]);
+extern const struct forward_spec *forward_url(struct client_state *csp,
+                                              const struct http_request *http);
 
 /*
  * Content modification
@@ -106,11 +99,10 @@ extern int filters_available(const struct client_state *csp);
  */
 extern struct http_response *direct_response(struct client_state *csp);
 
-/*
- * Revision control strings from this header and associated .c file
- */
-extern const char filters_rcs[];
-extern const char filters_h_rcs[];
+#ifdef FUZZ
+extern char *gif_deanimate_response(struct client_state *csp);
+extern jb_err remove_chunked_transfer_coding(char *buffer, size_t *size);
+#endif
 
 #endif /* ndef FILTERS_H_INCLUDED */
 

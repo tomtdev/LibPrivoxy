@@ -9,25 +9,23 @@
 #MASTER# COMMENT:
 ######################################################################
 #
-#  File        :  $Source: /cvsroot/ijbswa/current/default.action.master,v $
-#
-#  $Id: default.action.master,v 1.329 2016/05/12 08:42:25 fabiankeil Exp $
+#  File        :  default.action.master
 #
 #  Requires    :  This version requires Privoxy v3.0.11 or later due to
 #                 syntax changes.
 #
 #  Purpose     :  Default actions file, see
-#                 http://www.privoxy.org/user-manual/actions-file.html.
+#                 https://www.privoxy.org/user-manual/actions-file.html.
 #                 This file is subject to periodic updating. It is
 #                 not supposed to be edited by the user. Local exceptions
 #                 and enhancements are better placed in user.action,
 #                 the match-all section has been moved to match-all.action.
 #
-#  Copyright   :  Written by and Copyright (C) 2001-2016 the
-#                 Privoxy team. http://www.privoxy.org/
+#  Copyright   :  Written by and Copyright (C) 2001-2018 the
+#                 Privoxy team. https://www.privoxy.org/
 #
 # Feedback welcome, for details please have a look at:
-# http://www.privoxy.org/user-manual/contact.html
+# https://www.privoxy.org/user-manual/contact.html
 #
 # The current development version of this file is located:
 # http://ijbswa.cvs.sourceforge.net/viewvc/ijbswa/current/default.action.master
@@ -37,7 +35,7 @@
 #############################################################################
 #
 # A much better explanation can be found in the user manual which is
-# part of the distribution and can be found at http://www.privoxy.org/user-manual
+# part of the distribution and can be found at https://www.privoxy.org/user-manual
 #
 # To determine which actions apply to a request, the URL of the request is
 # compared to all patterns in this file. Every time it matches, the list of
@@ -693,6 +691,8 @@ linuxcounter.net/
 adina*.
 # URL = http://adelelimedesign.deviantart.com/
 adele*.
+# URL = http://adlibris.com/
+adlibris.
 
 #############################################################################
 # Generic block patterns by path:
@@ -1495,7 +1495,7 @@ b.collective-media.net/
 # Blocked URL = http://spiegel.ivwbox.de/cgi-bin/ivw/CP/1001;/home/c-18/be-PB64-aG9tZXBhZ2UvY2VudGVy/szwprofil-1001
 #MASTER# BLOCK-REFERRER: http://www.heise.de/
 # Blocked URL = http://heise.ivwbox.de/2004/01/survey.js
- .ivwbox.de/
+.ivwbox.de/
 
 #----------------------------------------------------------------------------
 # Specific counters (see above for generic patterns)
@@ -1941,6 +1941,12 @@ klikki.fi/adv/
 #MASTER# UNBLOCK-REFERRER: http://www.ardmediathek.de/tv
 # URL = http://www.ardmediathek.de/ard/static/img/ardmt/banner/ard-mediathek.svg
 .ardmediathek.de/
+# URL = http://adventofcode.com/
+adventofcode.com/
+# URL = http://msdn.microsoft.com/en-us/library/system.diagnostics.stacktrace.framecount.aspx
+msdn.microsoft.com/
+# URL = http://talks.golang.org/2013/advconc/gopherswrench.jpg
+.golang.org/
 
 
 #############################################################################
@@ -2128,6 +2134,8 @@ yandex.ru/.*&retpath=http
 .yandex.ru/.*\?page-url=
 # URL = http://disqus.com/forums/daemonicdispatches/get_num_replies.js?url8=http%3A%2F%2Fwww.daemonology.net%2Fblog%2F2014-12-25-when-security-goes-right.html%23disqus_thread&
 disqus.com/
+# URL = http://www.youtube.com/embed/blafasel?feature=oembed&enablejsapi=1&origin=http://www.example.com&wmode=opaque
+.youtube.com/.*origin=http
 
 {+redirect{s@.*url=@http://@} -block}
 # Sticky Actions = +redirect -block
@@ -2558,7 +2566,29 @@ TAG:^IMAGE-REQUEST$
 #############################################################################
 # Depends on +client-header-tagger{css-requests}
 #############################################################################
-{+handle-as-empty-document \
+{-deanimate-gifs \
+ -filter{html-annoyances} \
+ -filter{content-cookies} \
+ -filter{refresh-tags} \
+ -filter{img-reorder} \
+ -filter{banners-by-size} \
+ -filter{banners-by-link} \
+ -filter{webbugs} \
+ -filter{tiny-textforms} \
+ -filter{frameset-borders} \
+ -filter{iframes} \
+ -filter{demoronizer} \
+ -filter{shockwave-flash} \
+ -filter{quicktime-kioskmode} \
+ -filter{fun} \
+ -filter{crude-parental} \
+ -filter{site-specifics} \
+ -filter{no-ping} \
+ -filter{google} \
+ -filter{yahoo} \
+ -filter{msn} \
+ -filter{blogspot} \
+ +handle-as-empty-document \
  -handle-as-image \
 }
 TAG:^CSS-REQUEST$
